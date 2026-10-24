@@ -7,6 +7,7 @@ from .lich_phong import LichPhong, LichPhongBase, LichPhongCreate, LichPhongUpda
 from .yeu_cau_muon import YeuCauMuon, YeuCauMuonBase, YeuCauMuonCreate, YeuCauMuonDuyet, YeuCauMuonRead
 from .phieu_bao_hong import PhieuBaoHong, PhieuBaoHongBase, PhieuBaoHongCreate, PhieuBaoHongUpdate, PhieuBaoHongRead
 from .dien_nang import DienNang, DienNangBase, DienNangCreate, DienNangUpdate, DienNangRead
+from .ai_agent import ChatMessage, ChatRequest, ChatResponse
 
 __all__ = [
     # 1. Cơ sở
@@ -27,4 +28,6 @@ __all__ = [
     "PhieuBaoHong", "PhieuBaoHongBase", "PhieuBaoHongCreate", "PhieuBaoHongUpdate", "PhieuBaoHongRead",
     # 9. Điện năng
     "DienNang", "DienNangBase", "DienNangCreate", "DienNangUpdate", "DienNangRead",
+    # 10. AI Agent
+    "ChatMessage", "ChatRequest", "ChatResponse",
 ]
