@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
@@ -22,3 +22,4 @@ class ChatResponse(BaseModel):
     action_taken: Optional[str] = None
     model_used: Optional[str] = None
     data_source: Optional[str] = None
+    data: Optional[Any] = Field(default=None, description="Dữ liệu cấu trúc gốc từ Tool nếu có")

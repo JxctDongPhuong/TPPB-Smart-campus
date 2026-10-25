@@ -1,18 +1,22 @@
 import os
 import json
-import threading
+import logging
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
-from sqlmodel import Session, select, func
+from sqlmodel import Session
 
 from google import genai
 from google.genai import types
 
-from app.models import (
-    Phong, LichPhong, DienNang, ThietBi, PhieuBaoHong, YeuCauMuon
+from app.service.ai_tools import (
+    GEMINI_TOOL_DECLARATIONS,
+    execute_ai_tool,
+    format_tool_response
 )
 from app.service.metricService import detect_waste_energy, get_energy_summary
+
+logger = logging.getLogger("smart_campus.chatbot")
 
 # Nạp biến môi trường từ .env
 load_dotenv()
@@ -21,180 +25,41 @@ load_dotenv()
 SUPPORTED_MODELS = [
     "gemini-3.1-flash-lite",
     "gemini-3.5-flash-lite",
-    "gemini-2.5-flash",
     "gemini-2.0-flash",
 ]
 
-# PROMPT TỐI ƯU: TRẢ LỜI NGẮN GỌN, HỎI GÌ ĐÁP ĐẤY, KHÔNG RƯỜM RÀ
-CAMPUS_SYSTEM_PROMPT = """
-Bạn là Trợ lý AI Điều Hành Smart Campus trường đại học.
-QUY TẮC PHẢN HỒI BẮT BUỘC (TUÂN THỦ 100%):
-1. TRẢ LỜI NGẮN GỌN, TRỰC DIỆN, ĐI THẲNG VÀO VẤN ĐỀ:
-   - TUYỆT ĐỐI KHÔNG chào hỏi rườm rà (Bỏ toàn bộ các câu: "Chào bạn, tôi là trợ lý... rất vui được hỗ trợ...").
-   - TUYỆT ĐỐI KHÔNG lặp lại câu hỏi của người dùng ("Bạn đang tìm kiếm...", "Dựa trên dữ liệu...").
-   - TUYỆT ĐỐI KHÔNG chia mục phân tích dài dòng (Cấm viết kiểu: "1. Phân tích yêu cầu", "2. Kết quả kiểm tra", "3. Hướng dẫn tiếp theo").
-2. HỎI ĐÂU ĐÁP ĐÓ (Chỉ từ 1 đến 3 câu ngắn gọn):
-   - Hỏi tìm phòng trống: Báo ngay danh sách phòng trống kèm mã phòng, loại phòng và sức chứa.
-     Ví dụ: "Hiện tại Ca 3 có phòng máy tính A203 (45 máy) và A204 (40 máy) đang trống. Bạn có muốn tạo đơn mượn không?"
-   - Nếu chưa có phòng hoặc thiếu dữ liệu: Nói thẳng ngắn gọn: "Hiện tại hệ thống chưa ghi nhận phòng trống nào đáp ứng yêu cầu của bạn. Bạn vui lòng liên hệ Ban quản lý cơ sở vật chất."
-   - Hỏi về điện năng: Trả lời ngay số phòng lãng phí và mức tiêu thụ (kWh).
-3. ĐỐI VỚI HỘI THOẠI NHIỀU LƯỢT (MULTI-TURN):
-   - Phải ghi nhớ ngữ cảnh câu hỏi trước đó để trả lời liền mạch, tự nhiên và súc tích.
-4. Căn cứ đúng [DỮ LIỆU THỰC TẾ CAMPUS] được cung cấp. Không tự bịa đặt thông tin.
-"""
-
-def build_campus_context_from_db(session: Session) -> str:
-    """
-    Truy vấn trực tiếp Database SQLite để đóng gói toàn bộ dữ liệu cơ sở vật chất.
-    Hàm này chỉ được chạy 1 LẦN khi nạp cache (Lazy Loading), không bị gọi lặp lại.
-    """
-    today = date.today()
-    
-    # 1. Danh sách phòng
-    rooms = session.exec(select(Phong).where(Phong.da_xoa == False)).all()
-    room_summary = []
-    for r in rooms:
-        room_summary.append(
-            f"- Phòng {r.ma_phong} ({r.ten_phong}): {r.loai_phong}, Tòa {r.toa} Tầng {r.tang}, {r.suc_chua} chỗ, trạng thái: {r.trang_thai}"
-        )
-    rooms_text = "\n".join(room_summary) if room_summary else "Chưa có dữ liệu phòng học trong hệ thống."
-
-    # 2. Lịch phòng hôm nay và sắp tới
-    schedules = session.exec(
-        select(LichPhong).where(LichPhong.ngay >= today).order_by(LichPhong.ngay, LichPhong.ca)
-    ).all()
-    schedule_summary = []
-    for s in schedules:
-        schedule_summary.append(
-            f"- Ngày {s.ngay}: Phòng {s.ma_phong} có lịch Ca {s.ca} (Môn: {s.ten_mon_hoc})"
-        )
-    schedules_text = "\n".join(schedule_summary) if schedule_summary else "Hôm nay không có lịch học nào được xếp."
-
-    # 3. Phân tích điện năng & Idle Waste hôm nay
-    waste_data = detect_waste_energy(session, today)
-    energy_summary = get_energy_summary(session)
-    
-    waste_text = f"Số phòng nghi vấn lãng phí điện: {waste_data['tong_so_phong_lang_phi']}"
-    if waste_data["danh_sach_canh_bao"]:
-        for w in waste_data["danh_sach_canh_bao"]:
-            waste_text += f", Phòng {w['ma_phong']} ({w['kwh_tieu_thu']} kWh - không ca học)"
-
-    # 4. Phiếu báo hỏng thiết bị đang xử lý
-    pending_tickets = session.exec(
-        select(PhieuBaoHong).where(PhieuBaoHong.trang_thai != "Đã xử lý")
-    ).all()
-    tickets_summary = [f"Phòng/TB #{t.ma_tb}: {t.mo_ta_loi}" for t in pending_tickets]
-    tickets_text = "; ".join(tickets_summary) if tickets_summary else "Không có thiết bị báo hỏng tồn đọng."
-
+def get_system_prompt() -> str:
+    today_str = date.today().strftime("%Y-%m-%d")
     return f"""
-[DỮ LIỆU CAMPUS THỜI ĐIỂM {datetime.now().strftime('%H:%M %d/%m/%Y')}]:
-- PHÒNG HỌC:
-{rooms_text}
-- LỊCH HỌC:
-{schedules_text}
-- TIÊU THỤ ĐIỆN & LÃNG PHÍ: {waste_text}. Tổng điện: {energy_summary['tong_kwh']} kWh.
-- BÁO HỎNG: {tickets_text}
+Bạn là Trợ lý AI Điều Hành Smart Campus trường đại học.
+HÔM NAY LÀ NGÀY: {today_str} (Mọi câu hỏi về 'hôm nay', 'chiều nay', 'hiện tại' đều ứng với ngày {today_str}).
+Nhiệm vụ của bạn là hỗ trợ sinh viên, giảng viên và ban quản lý tra cứu phòng học, kiểm tra lịch mượn, phát hiện lãng phí điện năng và tiếp nhận sự cố kỹ thuật.
+
+QUY TẮC PHẢN HỒI BẮT BUỘC (TUÂN THỦ 100%):
+1. TRẢ LỜI TRỰC DIỆN, NGẮN GỌN, ĐÚNG TRỌNG TÂM:
+   - TUYỆT ĐỐI KHÔNG chào hỏi rườm rà (Bỏ toàn bộ các câu: "Chào bạn, tôi là trợ lý...").
+   - TUYỆT ĐỐI KHÔNG lặp lại câu hỏi của người dùng ("Bạn đang muốn tìm...", "Dựa vào yêu cầu...").
+   - Hỏi đâu đáp đó, câu trả lời từ 1 đến 3 câu súc tích.
+2. SỬ DỤNG CÔNG CỤ (TOOLS):
+   - Khi người dùng cần tìm phòng trống, kiểm tra lịch học, báo hỏng thiết bị, kiểm tra lãng phí điện năng hoặc đặt phòng: BẮT BUỘC gọi công cụ tương ứng để lấy dữ liệu thực tế từ cơ sở dữ liệu.
+   - Khi gọi công cụ cho ngày hôm nay, hãy truyền tham số ngày là "{today_str}".
+   - TUYỆT ĐỐI KHÔNG tự bịa đặt số liệu khi chưa gọi công cụ.
+3. KHI HỆ THỐNG CHƯA CÓ DỮ LIỆU (status = 'no_data'):
+   - Nói thẳng rõ ràng: "Hiện tại hệ thống chưa ghi nhận dữ liệu trong cơ sở dữ liệu."
+   - TUYỆT ĐỐI KHÔNG báo kết quả là '0 phòng' hay '0 kWh' khi thực tế là hệ thống chưa có dữ liệu đo đạc.
 """
 
-
-# =====================================================================
-# BỘ NHỚ ĐỆM LAZY LOADING (Thread-Safe In-Memory Cache)
-# Đảm bảo an toàn đa luồng (Fix 4) & Không bị lặp query DB
-# =====================================================================
-
-class CampusContextCache:
-    def __init__(self, ttl_seconds: int = 600):
-        self.ttl_seconds = ttl_seconds
-        self.cached_context: Optional[str] = None
-        self.last_loaded_at: Optional[datetime] = None
-        self._lock = threading.Lock()
-
-    def is_valid(self) -> bool:
-        if self.cached_context is None or self.last_loaded_at is None:
-            return False
-        elapsed = (datetime.now() - self.last_loaded_at).total_seconds()
-        return elapsed < self.ttl_seconds
-
-    def invalidate(self):
-        """Xóa cache an toàn khi có sự kiện đặt phòng, duyệt phòng, sửa phòng (Fix 2)"""
-        with self._lock:
-            self.cached_context = None
-            self.last_loaded_at = None
-            print("[Cache Hook] Da xoa cache CampusContext. Luot chat tiep theo se nap lai du lieu.")
-
-    def get_or_load(self, session: Session, force_reload: bool = False) -> tuple[str, bool]:
-        """
-        Thread-safe Double Checked Locking:
-        - Lần đầu tiên gọi: Thực hiện nạp DB vào RAM.
-        - Các lần gọi tiếp theo: Trả về dữ liệu ngay từ RAM (0ms, không query DB).
-        """
-        if not force_reload and self.is_valid():
-            return self.cached_context, False
-
-        with self._lock:
-            # Double check tránh race condition khi nhiều luồng cùng gọi (Fix 4)
-            if not force_reload and self.is_valid():
-                return self.cached_context, False
-
-            print("[Lazy Loading] Dang doc du lieu tu Database vao bo nho dem RAM...")
-            self.cached_context = build_campus_context_from_db(session)
-            self.last_loaded_at = datetime.now()
-            print("[Lazy Loading] Da nap xong toan bo du lieu Campus vao RAM!")
-            return self.cached_context, True
-
-
-# Tạo đối tượng cache duy nhất (Singleton)
-campus_cache = CampusContextCache(ttl_seconds=600)
-
-
-def refresh_campus_cache(session: Session) -> str:
-    """Chủ động làm mới dữ liệu cache"""
-    ctx, _ = campus_cache.get_or_load(session, force_reload=True)
-    return ctx
-
-
-def call_gemini(
-    contents: List[Any],
-    system_instruction: str = CAMPUS_SYSTEM_PROMPT,
-    requested_model: str = "gemini-3.1-flash-lite"
-) -> tuple[str, str]:
-    """
-    Gọi Gemini API qua google-genai SDK hỗ trợ Multi-turn chat contents và fallback linh hoạt.
-    """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return (
-            "Chưa cấu hình GEMINI_API_KEY trong file .env.",
-            "none"
-        )
-
-    client = genai.Client(api_key=api_key)
-    candidates = [requested_model] + [m for m in SUPPORTED_MODELS if m != requested_model]
-    
-    last_error = None
-    for model_name in candidates:
-        try:
-            print(f"[Gemini API] Dang gui request toi model: {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.2, # Nhiệt độ thấp để trả lời ngắn gọn, chuẩn xác
-                ),
-            )
-            if response and response.text:
-                print(f"[Gemini API] Goi thanh cong! Nhan ket qua tu model: {model_name}")
-                return response.text.strip(), model_name
-        except Exception as e:
-            print(f"[Gemini API] Model {model_name} gap loi: {e}. Chuyen sang model tiep theo...")
-            last_error = e
-            continue
-
-    return (
-        f"Không thể kết nối AI lúc này: {str(last_error)}",
-        "error"
-    )
+def get_gemini_client() -> Optional[genai.Client]:
+    """Khởi tạo Client Gemini an toàn kèm try-catch"""
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            logger.error("[Gemini API] Chưa cấu hình GEMINI_API_KEY trong file .env.")
+            return None
+        return genai.Client(api_key=api_key)
+    except Exception as e:
+        logger.error(f"[Gemini Client Error] Lỗi khởi tạo genai.Client: {e}")
+        return None
 
 
 def handle_chat(
@@ -205,18 +70,35 @@ def handle_chat(
     model_name: Optional[str] = "gemini-3.1-flash-lite"
 ) -> Dict[str, Any]:
     """
-    Xử lý câu hỏi với Multi-turn Chat History (Fix 1), Lazy Loading Cache (Fix 4),
-    và câu trả lời siêu súc tích trực diện.
+    Xử lý câu hỏi qua mô hình AI Agent Tools (Function Calling):
+    - Tự động phân tích ý định và kích hoạt Tool tương ứng
+    - Không hard-code if-else
+    - Try-catch an toàn tuyệt đối mọi bước tương tác DB và API
     """
-    model_to_use = model_name or "gemini-3.1-flash-lite"
-    
-    # 1. Lấy context dữ liệu qua Thread-safe Lazy Loading Cache
-    context, was_lazy_loaded = campus_cache.get_or_load(session)
+    client = get_gemini_client()
+    if not client:
+        return {
+            "reply": "Chưa cấu hình GEMINI_API_KEY trong file .env của hệ thống Backend.",
+            "action_taken": "error_config",
+            "model_used": "none",
+            "data_source": "none",
+            "data": None
+        }
 
-    # 2. Xây dựng danh sách Contents cho Gemini hỗ trợ Chat History
-    gemini_contents = []
+    requested_model = model_name or "gemini-3.1-flash-lite"
+    candidates = [requested_model] + [m for m in SUPPORTED_MODELS if m != requested_model]
 
-    # Nạp lịch sử hội thoại trước đó nếu có (Fix 1)
+    # Chuẩn bị danh sách Tools cho Gemini
+    gemini_tools = [
+        types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(**decl) for decl in GEMINI_TOOL_DECLARATIONS
+            ]
+        )
+    ]
+
+    # Xây dựng lịch sử hội thoại Multi-turn
+    gemini_contents: List[types.Content] = []
     if history:
         for item in history:
             role = "model" if item.get("role") in ["assistant", "model"] else "user"
@@ -229,46 +111,79 @@ def handle_chat(
                     )
                 )
 
-    # Tin nhắn hiện tại kèm Context trường học
-    current_message_text = f"""{context}
-
----
-CÂU HỎI HIỆN TẠI CỦA NGƯỜI DÙNG:
-"{message}"
-
-(Yêu cầu: Trả lời trực diện, đúng trọng tâm, siêu ngắn gọn trong 1-3 câu, không chào hỏi, không chia mục dài dòng)."""
-
-    gemini_contents.append(
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=current_message_text)]
-        )
+    # Tin nhắn hiện tại của người dùng
+    user_content = types.Content(
+        role="user",
+        parts=[types.Part.from_text(text=message)]
     )
+    gemini_contents.append(user_content)
 
-    # 3. Gọi Gemini API
-    reply, actual_model = call_gemini(
-        contents=gemini_contents,
-        system_instruction=CAMPUS_SYSTEM_PROMPT,
-        requested_model=model_to_use
-    )
+    # Thử lần lượt các model trong danh sách fallback
+    last_error = None
+    for model in candidates:
+        try:
+            logger.info(f"[Gemini Agent] Đang xử lý câu hỏi với model: {model}...")
+            
+            # Lần gọi 1: Cho AI phân tích và quyết định có cần kích hoạt Tool không
+            response = client.models.generate_content(
+                model=model,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=get_system_prompt(),
+                    temperature=0.2,
+                    tools=gemini_tools
+                )
+            )
 
-    # 4. Phân loại hành động
-    cau_hoi = message.lower()
-    if any(k in cau_hoi for k in ["phòng trống", "mượn phòng", "tìm phòng"]):
-        action = "room_availability_check"
-    elif any(k in cau_hoi for k in ["điện", "tiết kiệm", "lãng phí", "kwh"]):
-        action = "energy_waste_consulting"
-    elif any(k in cau_hoi for k in ["hỏng", "sửa", "bảo trì", "thiết bị"]):
-        action = "device_maintenance_inquiry"
-    else:
-        action = "smart_campus_consulting"
+            # Trường hợp 1: AI kích hoạt một Tool theo kịch bản
+            if response and response.function_calls:
+                fn_call = response.function_calls[0]
+                tool_name = fn_call.name
+                tool_args = dict(fn_call.args) if fn_call.args else {}
+                logger.info(f"[Gemini Agent] AI quyết định kích hoạt tool: '{tool_name}' với tham số: {tool_args}")
 
+                # Thực thi Tool với Session DB và user_id an toàn
+                tool_result = execute_ai_tool(tool_name, tool_args, session=session, user_id=user_id)
+
+                # Format trực tiếp dữ liệu từ Tool thành Markdown câu trả lời hoàn chỉnh (Đúng 1 lượt call AI)
+                reply_text = format_tool_response(tool_name, tool_args, tool_result)
+
+                return {
+                    "reply": reply_text,
+                    "action_taken": tool_name,  # Phân loại hành động tự động từ tên Tool
+                    "model_used": model,
+                    "data_source": f"tool:{tool_name}",
+                    "data": tool_result
+                }
+
+            # Trường hợp 2: AI trả lời trực tiếp (câu hỏi thông thường, giải thích)
+            elif response and response.text:
+                return {
+                    "reply": response.text.strip(),
+                    "action_taken": "general_consulting",
+                    "model_used": model,
+                    "data_source": "llm_direct",
+                    "data": None
+                }
+
+        except Exception as e:
+            logger.warning(f"[Gemini Agent Error] Model {model} gặp sự cố: {e}. Đang thử model tiếp theo...")
+            last_error = e
+            continue
+
+    # Nếu tất cả model đều lỗi
     return {
-        "reply": reply,
-        "action_taken": action,
-        "model_used": actual_model,
-        "data_source": "lazy_loaded_from_db" if was_lazy_loaded else "memory_cache"
+        "reply": f"Hệ thống trợ lý AI tạm thời gián đoạn kết nối: {str(last_error)}",
+        "action_taken": "error",
+        "model_used": "none",
+        "data_source": "error",
+        "data": None
     }
+
+
+def refresh_campus_cache(session: Session) -> str:
+    """Hỗ trợ endpoint làm mới cache nếu router cần gọi"""
+    return "Đã làm mới cơ chế tra cứu dữ liệu thời gian thực."
 
 
 def get_ai_suggestions(
@@ -277,18 +192,33 @@ def get_ai_suggestions(
 ) -> Dict[str, Any]:
     """
     AI phân tích tối ưu điện năng dạng JSON có cấu trúc.
+    Kèm kiểm tra dữ liệu chặt chẽ tránh trả về '0 0' khi chưa có dữ liệu trong DB.
     """
     today = date.today()
-    waste_info = detect_waste_energy(session, today)
-    energy_summary = get_energy_summary(session)
 
-    prompt = f"""
-Số liệu điện năng Smart Campus hôm nay ({today}):
-- Cảnh báo lãng phí: {json.dumps(waste_info['danh_sach_canh_bao'], ensure_ascii=False)}
+    try:
+        waste_info = detect_waste_energy(session, today)
+        energy_summary = get_energy_summary(session)
+
+        # XỬ LÝ TRƯỜNG HỢP DB CHƯA CÓ DỮ LIỆU: Không gọi AI để tránh trả ra kết quả '0 0'
+        if not waste_info.get("has_data") and not energy_summary.get("has_data"):
+            return {
+                "status": "no_data",
+                "summary": f"Hệ thống hiện tại chưa ghi nhận dữ liệu đo đạc điện năng cho ngày {today}.",
+                "total_wasted_kwh": None,
+                "estimated_wasted_vnd": None,
+                "suggestions": [],
+                "policy_advice": "Vui lòng cập nhật hoặc nạp dữ liệu công tơ điện vào hệ thống trước khi chạy phân tích tối ưu năng lượng.",
+                "model_used": "system_guard"
+            }
+
+        prompt = f"""
+Số liệu điện năng Smart Campus ngày ({today}):
+- Cảnh báo lãng phí: {json.dumps(waste_info.get('danh_sach_canh_bao', []), ensure_ascii=False)}
 - Tổng hợp điện năng: {json.dumps(energy_summary, ensure_ascii=False)}
 
 Yêu cầu:
-Giả sử giá điện là 2.500 VNĐ / kWh, trả về JSON duy nhất (không bọc markdown):
+Giả sử giá điện là 2.500 VNĐ / kWh, trả về JSON duy nhất (không bọc markdown, không dẫn nhập):
 {{
   "summary": "Tóm tắt ngắn gọn trong 1 câu",
   "total_wasted_kwh": <số>,
@@ -306,16 +236,26 @@ Giả sử giá điện là 2.500 VNĐ / kWh, trả về JSON duy nhất (không
   "policy_advice": "Khuyến nghị chính sách ngắn"
 }}
 """
+        client = get_gemini_client()
+        if not client:
+            return {
+                "summary": "Chưa cấu hình API Key.",
+                "total_wasted_kwh": None,
+                "estimated_wasted_vnd": None,
+                "suggestions": []
+            }
 
-    model_to_use = model_name or "gemini-3.1-flash-lite"
-    raw_response, actual_model = call_gemini(
-        contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
-        system_instruction="Chỉ trả về JSON thuần túy, không có text dẫn nhập.",
-        requested_model=model_to_use
-    )
+        model_to_use = model_name or "gemini-3.1-flash-lite"
+        response = client.models.generate_content(
+            model=model_to_use,
+            contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+            config=types.GenerateContentConfig(
+                system_instruction="Chỉ trả về JSON thuần túy, không có text dẫn nhập.",
+                temperature=0.1
+            )
+        )
 
-    try:
-        clean_text = raw_response.strip()
+        clean_text = response.text.strip()
         if clean_text.startswith("```json"):
             clean_text = clean_text[7:]
         if clean_text.startswith("```"):
@@ -323,14 +263,17 @@ Giả sử giá điện là 2.500 VNĐ / kWh, trả về JSON duy nhất (không
         if clean_text.endswith("```"):
             clean_text = clean_text[:-3]
         clean_text = clean_text.strip()
-        
+
         parsed = json.loads(clean_text)
-        parsed["model_used"] = actual_model
+        parsed["model_used"] = model_to_use
         return parsed
-    except Exception:
+
+    except Exception as e:
+        logger.error(f"[get_ai_suggestions Error]: {e}")
         return {
-            "summary": f"Phân tích năng lượng ngày {today}",
-            "ai_analysis": raw_response,
-            "waste_detection_raw": waste_info,
-            "model_used": actual_model
+            "status": "error",
+            "summary": f"Không thể phân tích dữ liệu điện năng lúc này: {str(e)}",
+            "total_wasted_kwh": None,
+            "estimated_wasted_vnd": None,
+            "suggestions": []
         }
