@@ -38,11 +38,16 @@ export function OccupancyChart({ data = mockCampusData.occupancyHourly, building
       {/* Chart Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">
-            Tỷ lệ sử dụng phòng theo thời gian
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">
+              Tỷ lệ sử dụng phòng theo thời gian
+            </h2>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+              Future • IoT Telemetry
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Dữ liệu cảm biến đo theo thời gian thực (Occupancy Telemetry)
+            Dữ liệu cảm biến thời gian thực (Tính năng dự kiến mở rộng cùng Gateway cảm biến IoT)
           </p>
         </div>
 

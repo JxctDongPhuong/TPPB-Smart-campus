@@ -108,22 +108,10 @@ export function FloorPlanViewer({ rooms = [], selectedRoomId = 'C101', onSelectR
 
         {/* Dynamic Architectural Grid */}
         <div className="space-y-3">
-          {/* HÀNG TRÊN: Khu C & B */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {rooms.slice(0, 5).map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                isSelected={room.id === selectedRoomId}
-                onClick={() => onSelectRoom?.(room.id)}
-              />
-            ))}
-          </div>
-
-          {/* HÀNG GIỮA: Sảnh trung tâm & Lối đi hành lang */}
-          <div className="grid grid-cols-12 gap-3 items-center py-2">
-            <div className="col-span-3">
-              {rooms.slice(5, 6).map((room) => (
+          {rooms.length <= 8 ? (
+            /* Khi số phòng ít (Database hiện tại) -> Hiển thị dạng lưới trực quan đầy đủ */
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {rooms.map((room) => (
                 <RoomCard
                   key={room.id}
                   room={room}
@@ -132,38 +120,67 @@ export function FloorPlanViewer({ rooms = [], selectedRoomId = 'C101', onSelectR
                 />
               ))}
             </div>
+          ) : (
+            /* Khi sơ đồ đầy đủ */
+            <>
+              {/* HÀNG TRÊN: Khu C & B */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {rooms.slice(0, 5).map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    isSelected={room.id === selectedRoomId}
+                    onClick={() => onSelectRoom?.(room.id)}
+                  />
+                ))}
+              </div>
 
-            {/* Sảnh hành lang thông thoáng */}
-            <div className="col-span-6 border-2 border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center bg-white/70 shadow-2xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                SẢNH TRUNG TÂM & HÀNH LANG CHÍNH
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">Khu sinh hoạt chung • Wi-Fi Mesh công suất cao</span>
-            </div>
+              {/* HÀNG GIỮA: Sảnh trung tâm & Lối đi hành lang */}
+              <div className="grid grid-cols-12 gap-3 items-center py-2">
+                <div className="col-span-3">
+                  {rooms.slice(5, 6).map((room) => (
+                    <RoomCard
+                      key={room.id}
+                      room={room}
+                      isSelected={room.id === selectedRoomId}
+                      onClick={() => onSelectRoom?.(room.id)}
+                    />
+                  ))}
+                </div>
 
-            <div className="col-span-3 space-y-2">
-              {rooms.slice(6, 8).map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  isSelected={room.id === selectedRoomId}
-                  onClick={() => onSelectRoom?.(room.id)}
-                />
-              ))}
-            </div>
-          </div>
+                {/* Sảnh hành lang thông thoáng */}
+                <div className="col-span-6 border-2 border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center bg-white/70 shadow-2xs">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    SẢNH TRUNG TÂM & HÀNH LANG CHÍNH
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Khu sinh hoạt chung • Wi-Fi Mesh công suất cao</span>
+                </div>
 
-          {/* HÀNG DƯỚI: Khu Tòa A & D */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-            {rooms.slice(8, 14).map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                isSelected={room.id === selectedRoomId}
-                onClick={() => onSelectRoom?.(room.id)}
-              />
-            ))}
-          </div>
+                <div className="col-span-3 space-y-2">
+                  {rooms.slice(6, 8).map((room) => (
+                    <RoomCard
+                      key={room.id}
+                      room={room}
+                      isSelected={room.id === selectedRoomId}
+                      onClick={() => onSelectRoom?.(room.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* HÀNG DƯỚI: Khu Tòa A & D */}
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+                {rooms.slice(8, 14).map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    isSelected={room.id === selectedRoomId}
+                    onClick={() => onSelectRoom?.(room.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Lối vào chính */}
           <div className="flex justify-center pt-2">

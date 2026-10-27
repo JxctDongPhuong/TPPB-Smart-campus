@@ -18,11 +18,16 @@ export function EnergyDonut({ data = mockCampusData.energyBreakdown }) {
       <div>
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">
-              Phân bổ năng lượng
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                Phân bổ năng lượng
+              </h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                Future • Sub-metering
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Tiêu thụ hôm nay: <span className="font-semibold text-slate-800 font-mono">8,240 kWh</span>
+              Phân tách phụ tải chi tiết (Dự kiến mở rộng công tơ phụ)
             </p>
           </div>
           <button className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700">

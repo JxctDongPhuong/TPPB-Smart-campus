@@ -22,6 +22,7 @@ export default function App() {
   const [selectedRoomDetail, setSelectedRoomDetail] = useState(mockCampusData.selectedRoomDetail);
   const [wasteAlert, setWasteAlert] = useState(mockCampusData.aiWasteAlert);
   const [alerts, setAlerts] = useState(mockCampusData.recentAlerts);
+  const [recommendations, setRecommendations] = useState(mockCampusData.aiRecommendations);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,14 +31,26 @@ export default function App() {
   const loadData = async () => {
     setIsRefreshing(true);
     try {
-      const [sumRes, roomsRes, wasteRes] = await Promise.all([
+      const [sumRes, roomsRes, wasteRes, alertsRes, recsRes] = await Promise.allSettled([
         campusApi.getSummary(),
         campusApi.getRooms('A', 1),
-        campusApi.getWasteAlerts()
+        campusApi.getWasteAlerts(),
+        campusApi.getAlerts(),
+        campusApi.getAiRecommendations()
       ]);
-      setSummary(sumRes);
-      setRooms(roomsRes);
-      if (wasteRes?.length) setWasteAlert(wasteRes[0]);
+
+      if (sumRes.status === 'fulfilled') setSummary(sumRes.value);
+      if (roomsRes.status === 'fulfilled' && roomsRes.value?.length) {
+        setRooms(roomsRes.value);
+        // Tự động load chi tiết phòng đầu tiên nếu có
+        if (roomsRes.value[0]?.id) {
+          setSelectedRoomId(roomsRes.value[0].id);
+          campusApi.getRoomDetail(roomsRes.value[0].id).then(setSelectedRoomDetail);
+        }
+      }
+      if (wasteRes.status === 'fulfilled' && wasteRes.value?.length) setWasteAlert(wasteRes.value[0]);
+      if (alertsRes.status === 'fulfilled' && alertsRes.value?.length) setAlerts(alertsRes.value);
+      if (recsRes.status === 'fulfilled' && recsRes.value?.length) setRecommendations(recsRes.value);
     } catch (e) {
       console.warn('API error or fallback:', e);
     } finally {
@@ -122,6 +135,7 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             <EnergyDonut />
             <AiRecommendations 
+              recommendations={recommendations}
               onExecute={(id) => alert(`Đã kích hoạt kịch bản điều khiển tự động: ${id}`)}
             />
             <AlertsList 

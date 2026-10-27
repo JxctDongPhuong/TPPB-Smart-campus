@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+*.env
+**/.env
+node_modules
+**/node_modules
+dist
+**/dist
+__pycache__
+**/__pycache__
+venv
+.venv
+*.db
+campus.db

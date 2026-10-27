@@ -126,10 +126,15 @@ export function RoomDetailDrawer({ roomDetail, onToggleDevice }) {
         {/* Thiết bị IoT trong phòng */}
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Thiết bị & Cảm biến ({roomDetail?.devices?.length || 5})
-            </span>
-            <span className="text-[11px] text-slate-400">Click icon để bật/tắt</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Thiết bị & Cảm biến ({roomDetail?.devices?.length || 0})
+              </span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                Future • Relay Switch
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400">Mô phỏng bật/tắt</span>
           </div>
 
           <div className="space-y-2 max-h-56 overflow-y-auto pr-1">

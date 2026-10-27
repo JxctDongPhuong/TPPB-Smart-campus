@@ -1,0 +1,22 @@
+services:
+  backend:
+    container_name: smart-campus-backend
+    build:
+      context: ./Smart-campus-backEnd
+      dockerfile: dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    restart: unless-stopped
+
+  frontend:
+    container_name: smart-campus-frontend
+    build:
+      context: ./Smart-campus-frontEnd
+      dockerfile: dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

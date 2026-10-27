@@ -18,7 +18,7 @@ def get_schedules(
     ngay: Optional[date] = Query(None, description="Lọc theo ngày (YYYY-MM-DD)"),
     session: Session = Depends(get_session)
 ):
-    return 
+    return bookingService.get_schedules(session, ma_phong=ma_phong, ngay=ngay)
 
 @router.post("/schedule", response_model=LichPhongRead, status_code=status.HTTP_201_CREATED, summary="Thêm lịch học chính khóa")
 def create_schedule(schedule_data: LichPhongCreate, session: Session = Depends(get_session)):
