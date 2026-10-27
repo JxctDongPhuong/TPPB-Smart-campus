@@ -1,51 +1,39 @@
 import React from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
-import { Zap, Tv, Users, ArrowUpRight } from 'lucide-react';
+import { Zap, Wrench, AlertTriangle } from 'lucide-react';
 import { mockCampusData } from '../../data/mockData';
 
 export function AlertsList({ alerts = mockCampusData.recentAlerts, onViewAll }) {
-  const getAlertIcon = (title) => {
-    if (title.includes('điện')) return Zap;
-    if (title.includes('chiếu') || title.includes('tính')) return Tv;
-    return Users;
-  };
-
-  const getSeverityBadgeVariant = (severity) => {
-    switch (severity) {
-      case 'critical': return 'danger';
-      case 'warning': return 'warning';
-      default: return 'info';
-    }
+  const getAlertIcon = (title = '') => {
+    if (title.includes('điện') || title.includes('Waste') || title.includes('lãng phí')) return Zap;
+    if (title.includes('nước') || title.includes('hỏng') || title.includes('Điều hòa')) return Wrench;
+    return AlertTriangle;
   };
 
   return (
-    <Card className="p-6 flex flex-col justify-between">
+    <Card className="p-6 flex flex-col justify-between animate-fade-in-up stagger-5 interactive-card">
       <div>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
             <h3 className="text-base font-bold text-slate-900 tracking-tight">
-              Cảnh báo gần đây
+              Sự Cố & Báo Hỏng
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {alerts.length} cảnh báo cần xử lý theo dõi
+              Từ bảng PhieuBaoHong & Cảnh báo Idle Waste
             </p>
           </div>
-          <button 
-            onClick={onViewAll}
-            className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
-          >
-            <span>Xem tất cả</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+          <Badge variant="warning" size="sm">
+            {alerts.length} vấn đề
+          </Badge>
         </div>
 
         {/* Alerts Stack */}
         <div className="space-y-3 mt-4">
           {alerts.map((alt) => {
             const Icon = getAlertIcon(alt.title);
-            const variant = getSeverityBadgeVariant(alt.severity);
+            const isCritical = alt.severity === 'critical';
 
             return (
               <div
@@ -54,29 +42,39 @@ export function AlertsList({ alerts = mockCampusData.recentAlerts, onViewAll }) 
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    alt.severity === 'critical' 
+                    isCritical 
                       ? 'bg-rose-100 text-rose-600' 
-                      : alt.severity === 'warning' 
-                      ? 'bg-amber-100 text-amber-600' 
-                      : 'bg-sky-100 text-sky-600'
+                      : 'bg-amber-100 text-amber-600'
                   }`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-900">{alt.title}</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {alt.location} • <span className="font-mono">{alt.time}</span>
+                      {alt.location} • <span className="font-mono text-slate-400">{alt.time}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-600 mt-1 font-medium">
+                      {alt.detail}
                     </p>
                   </div>
                 </div>
 
-                <Badge variant={variant} size="sm" className="shrink-0">
+                <Badge variant={isCritical ? 'danger' : 'warning'} size="sm" className="shrink-0">
                   {alt.severityLabel}
                 </Badge>
               </div>
             );
           })}
         </div>
+      </div>
+
+      <div className="pt-4 mt-3 border-t border-slate-100">
+        <button
+          onClick={onViewAll}
+          className="w-full py-2 text-center text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50/70 rounded-xl transition-all cursor-pointer"
+        >
+          Quản lý toàn bộ danh sách phiếu báo hỏng →
+        </button>
       </div>
     </Card>
   );

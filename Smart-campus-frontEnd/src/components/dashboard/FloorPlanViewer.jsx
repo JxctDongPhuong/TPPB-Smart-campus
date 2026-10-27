@@ -4,210 +4,140 @@ import { Badge } from '../common/Badge';
 import { 
   Building, 
   Layers, 
-  Calendar, 
-  Clock, 
-  Thermometer, 
   Users, 
   Zap,
-  Info
+  Info,
+  CalendarCheck,
+  AlertTriangle,
+  Wrench
 } from 'lucide-react';
 
-export function FloorPlanViewer({ rooms = [], selectedRoomId = 'C101', onSelectRoom }) {
-  const [selectedBuilding, setSelectedBuilding] = useState('A');
-  const [selectedFloor, setSelectedFloor] = useState('1');
-  const [selectedSession, setSelectedSession] = useState('morning');
+export function FloorPlanViewer({ rooms = [], selectedRoomId = 'A101', onSelectRoom }) {
+  const [selectedBuilding, setSelectedBuilding] = useState('ALL');
+  const [selectedFloor, setSelectedFloor] = useState('ALL');
 
-  // Room categorization
-  const activeRoomsCount = rooms.filter(r => r.status === 'active').length;
-  const emptyRoomsCount = rooms.filter(r => r.status === 'empty').length;
-  const totalOccupancyPercent = Math.round((activeRoomsCount / (rooms.length || 1)) * 100);
+  // Filter rooms by building and floor
+  const displayRooms = rooms.filter(r => {
+    const matchBuilding = selectedBuilding === 'ALL' || (r.toa || r.ma_phong?.charAt(0)) === selectedBuilding;
+    const roomFloor = r.tang !== undefined ? String(r.tang) : r.ma_phong?.charAt(1);
+    const matchFloor = selectedFloor === 'ALL' || roomFloor === selectedFloor;
+    return matchBuilding && matchFloor;
+  });
+
+  const activeRoomsCount = rooms.filter(r => r.trang_thai === 'Đang dùng' || r.hasScheduleToday).length;
+  const readyRoomsCount = rooms.filter(r => r.trang_thai === 'Sẵn sàng' && !r.hasScheduleToday && !r.isWasteAlert).length;
+  const issueRoomsCount = rooms.filter(r => r.trang_thai === 'Bảo trì' || r.hasIssue || r.isWasteAlert).length;
 
   return (
-    <Card className="p-6">
+    <Card className="p-6 animate-fade-in-up stagger-3">
       {/* Top Filter Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Bản đồ phòng học & Sơ đồ mặt bằng
+              Sơ đồ Mặt Bằng & Trạng Thái Phòng Học
             </h2>
-            <Badge variant="primary" size="sm">Trực quan hóa IoT</Badge>
+            <Badge variant="primary" size="sm">Cơ sở CS1</Badge>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Theo dõi trạng thái, sĩ số thực tế và điều khiển thiết bị phòng theo thời gian thực
+            Trực quan hóa phòng học, sức chứa và lịch đào tạo thực tế từ Database
           </p>
         </div>
 
-        {/* Dropdowns */}
+        {/* Dropdown Filters */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Tòa nhà */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
             <Building className="w-3.5 h-3.5 text-slate-500" />
             <select
               value={selectedBuilding}
               onChange={(e) => setSelectedBuilding(e.target.value)}
               className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
             >
+              <option value="ALL">Tất cả Tòa</option>
               <option value="A">Tòa A</option>
               <option value="B">Tòa B</option>
-              <option value="C">Lab C</option>
             </select>
           </div>
 
           {/* Tầng */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
             <Layers className="w-3.5 h-3.5 text-slate-500" />
             <select
               value={selectedFloor}
               onChange={(e) => setSelectedFloor(e.target.value)}
               className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
             >
+              <option value="ALL">Tất cả Tầng</option>
               <option value="1">Tầng 1</option>
               <option value="2">Tầng 2</option>
               <option value="3">Tầng 3</option>
             </select>
           </div>
-
-          {/* Ngày */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" />
-            <span>21/05/2024</span>
-          </div>
-
-          {/* Buổi */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-            <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <select
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-              className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="morning">Buổi sáng (07:00 - 11:30)</option>
-              <option value="afternoon">Buổi chiều (13:00 - 17:30)</option>
-              <option value="evening">Buổi tối (18:00 - 21:00)</option>
-            </select>
-          </div>
         </div>
       </div>
 
-      {/* Blueprint Sơ đồ Tầng */}
+      {/* Blueprint Grid Container */}
       <div className="mt-5 p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 bg-grid-pattern relative overflow-hidden">
         {/* Header Blueprint label */}
         <div className="flex items-center justify-between pb-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-extrabold tracking-wider text-slate-700 uppercase">
-              SƠ ĐỒ MẶT BẰNG TÒA {selectedBuilding} - TẦNG {selectedFloor}
+              {selectedBuilding === 'ALL' ? 'KHU VỰC TOÀN KHUÔN VIÊN' : `MẶT BẰNG TÒA ${selectedBuilding}`}
+              {selectedFloor !== 'ALL' && ` - TẦNG ${selectedFloor}`}
             </span>
-            <span className="text-[11px] text-slate-400 font-mono">Cập nhật lúc 10:35</span>
+            <span className="text-[11px] text-slate-400 font-mono">({displayRooms.length} phòng)</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
-            <Info className="w-3.5 h-3.5 text-slate-400" />
-            <span>Nhấp vào phòng để xem trạng thái thiết bị chi tiết</span>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <Info className="w-3.5 h-3.5 text-blue-500" />
+            <span>Chọn phòng để xem chi tiết thiết bị & lịch học</span>
           </div>
         </div>
 
         {/* Dynamic Architectural Grid */}
-        <div className="space-y-3">
-          {rooms.length <= 8 ? (
-            /* Khi số phòng ít (Database hiện tại) -> Hiển thị dạng lưới trực quan đầy đủ */
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {rooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  isSelected={room.id === selectedRoomId}
-                  onClick={() => onSelectRoom?.(room.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            /* Khi sơ đồ đầy đủ */
-            <>
-              {/* HÀNG TRÊN: Khu C & B */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                {rooms.slice(0, 5).map((room) => (
-                  <RoomCard
-                    key={room.id}
-                    room={room}
-                    isSelected={room.id === selectedRoomId}
-                    onClick={() => onSelectRoom?.(room.id)}
-                  />
-                ))}
-              </div>
-
-              {/* HÀNG GIỮA: Sảnh trung tâm & Lối đi hành lang */}
-              <div className="grid grid-cols-12 gap-3 items-center py-2">
-                <div className="col-span-3">
-                  {rooms.slice(5, 6).map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      isSelected={room.id === selectedRoomId}
-                      onClick={() => onSelectRoom?.(room.id)}
-                    />
-                  ))}
-                </div>
-
-                {/* Sảnh hành lang thông thoáng */}
-                <div className="col-span-6 border-2 border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center bg-white/70 shadow-2xs">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    SẢNH TRUNG TÂM & HÀNH LANG CHÍNH
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Khu sinh hoạt chung • Wi-Fi Mesh công suất cao</span>
-                </div>
-
-                <div className="col-span-3 space-y-2">
-                  {rooms.slice(6, 8).map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      isSelected={room.id === selectedRoomId}
-                      onClick={() => onSelectRoom?.(room.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* HÀNG DƯỚI: Khu Tòa A & D */}
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-                {rooms.slice(8, 14).map((room) => (
-                  <RoomCard
-                    key={room.id}
-                    room={room}
-                    isSelected={room.id === selectedRoomId}
-                    onClick={() => onSelectRoom?.(room.id)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Lối vào chính */}
-          <div className="flex justify-center pt-2">
-            <div className="px-6 py-1.5 bg-slate-200/80 border border-slate-300 rounded-full text-[11px] font-bold text-slate-600 tracking-wider flex items-center gap-2">
-              <span>▼ LỐI VÀO CHÍNH TÒA NHÀ ▼</span>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 py-2">
+          {displayRooms.map((room) => {
+            const roomId = room.ma_phong || room.id;
+            const isSelected = roomId === selectedRoomId;
+            return (
+              <RoomCard
+                key={roomId}
+                room={room}
+                isSelected={isSelected}
+                onClick={() => onSelectRoom?.(roomId)}
+              />
+            );
+          })}
         </div>
+
+        {displayRooms.length === 0 && (
+          <div className="py-12 text-center text-sm text-slate-400">
+            Không tìm thấy phòng nào phù hợp với bộ lọc đã chọn.
+          </div>
+        )}
       </div>
 
       {/* Blueprint Legend Footer */}
       <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-2 border-t border-slate-100 text-xs">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span className="text-slate-600 font-medium">Đang sử dụng ({activeRoomsCount} phòng)</span>
+            <span className="text-slate-600 font-medium">Đang có lớp ({activeRoomsCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
-            <span className="text-slate-600 font-medium">Phòng trống ({emptyRoomsCount} phòng)</span>
+            <span className="text-slate-600 font-medium">Phòng sẵn sàng ({readyRoomsCount})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span className="text-slate-600 font-medium">Cảnh báo / Bảo trì ({issueRoomsCount})</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 font-mono">
-          <span className="text-slate-500">Công suất toàn tầng:</span>
+        <div className="flex items-center gap-2 font-mono text-[11px]">
+          <span className="text-slate-500">Tổng sức chứa khả dụng:</span>
           <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-            {totalOccupancyPercent}%
+            {rooms.reduce((acc, r) => acc + (r.suc_chua || 40), 0)} chỗ
           </span>
         </div>
       </div>
@@ -216,50 +146,97 @@ export function FloorPlanViewer({ rooms = [], selectedRoomId = 'C101', onSelectR
 }
 
 function RoomCard({ room, isSelected, onClick }) {
-  const isActive = room.status === 'active';
+  const roomId = room.ma_phong || room.id;
+  const isOccupied = room.trang_thai === 'Đang dùng' || room.hasScheduleToday;
+  const isMaintenance = room.trang_thai === 'Bảo trì' || room.hasIssue;
+  const isWaste = room.isWasteAlert;
 
   return (
     <div
       onClick={onClick}
-      className={`relative p-3.5 rounded-xl border transition-all cursor-pointer select-none text-left ${
+      className={`relative p-4 rounded-xl border transition-all duration-300 cursor-pointer select-none text-left interactive-card ${
         isSelected
-          ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/30 shadow-md'
-          : isActive
-          ? 'bg-emerald-50/50 border-emerald-200/90 hover:border-emerald-400 hover:shadow-xs'
-          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-2xs opacity-80 hover:opacity-100'
+          ? 'bg-blue-50/95 border-blue-500 ring-2 ring-blue-500/30 shadow-md scale-[1.01]'
+          : isWaste
+          ? 'bg-amber-50/70 border-amber-300 hover:border-amber-400'
+          : isMaintenance
+          ? 'bg-rose-50/60 border-rose-200 hover:border-rose-300'
+          : isOccupied
+          ? 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-400'
+          : 'bg-white border-slate-200 hover:border-slate-300'
       }`}
     >
       {/* Top Header of Room */}
       <div className="flex items-center justify-between">
-        <span className={`font-mono font-bold text-sm ${isSelected ? 'text-blue-700' : 'text-slate-900'}`}>
-          {room.id}
-        </span>
-        <span
-          className={`w-2 h-2 rounded-full ${
-            isActive ? 'bg-emerald-500 shadow-xs shadow-emerald-400' : 'bg-slate-300'
-          }`}
-        />
+        <div className="flex items-center gap-2">
+          <span className={`font-mono font-extrabold text-base ${isSelected ? 'text-blue-700' : 'text-slate-900'}`}>
+            {roomId}
+          </span>
+          <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+            Tòa {room.toa || roomId.charAt(0)} • Tầng {room.tang || roomId.charAt(1)}
+          </span>
+        </div>
+
+        {/* Status indicator dot */}
+        <div className="flex items-center">
+          {isWaste ? (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+          ) : isMaintenance ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+          ) : isOccupied ? (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+          )}
+        </div>
       </div>
 
       {/* Room Category */}
-      <p className="text-[10px] text-slate-400 font-medium mt-0.5">{room.type}</p>
-
-      {/* Subject Name */}
-      <p className={`text-xs font-semibold truncate mt-1 ${isActive ? 'text-slate-800' : 'text-slate-400'}`}>
-        {room.subject}
+      <p className="text-[11px] text-slate-500 font-medium mt-1">
+        {room.loai_phong || room.type || 'Phòng học'}
       </p>
 
-      {/* Bottom Info: Capacity & Temp */}
-      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100/80 text-[10px]">
+      {/* Class Schedule / Current Status */}
+      <div className="mt-2 min-h-6">
+        {room.currentSchedule ? (
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 truncate">
+            <CalendarCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="truncate">{room.currentSchedule.ten_mon_hoc}</span>
+          </div>
+        ) : isWaste ? (
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 truncate">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="truncate">Lãng phí điện ({room.kwh} kWh)</span>
+          </div>
+        ) : isMaintenance ? (
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 truncate">
+            <Wrench className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+            <span className="truncate">Đang có phiếu sửa chữa</span>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400 font-medium">Hiện đang trống</span>
+        )}
+      </div>
+
+      {/* Bottom Info: Capacity & kWh */}
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 text-[11px]">
         <div className="flex items-center gap-1 text-slate-500 font-mono">
           <Users className="w-3 h-3 text-slate-400" />
-          <span>{isActive ? `${room.current}/${room.capacity}` : `0/${room.capacity}`}</span>
+          <span>Sức chứa: {room.suc_chua || room.capacity || 40}</span>
         </div>
 
-        <div className="flex items-center gap-1 text-slate-500 font-mono">
-          <Thermometer className="w-3 h-3 text-slate-400" />
-          <span>{room.temperature}°C</span>
-        </div>
+        {room.kwh > 0 && (
+          <div className="flex items-center gap-1 text-amber-600 font-mono font-semibold">
+            <Zap className="w-3 h-3" />
+            <span>{room.kwh} kWh</span>
+          </div>
+        )}
       </div>
     </div>
   );

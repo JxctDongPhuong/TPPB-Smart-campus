@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
-import { Sparkles, Leaf, Building2, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Leaf, Wrench, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { mockCampusData } from '../../data/mockData';
 
 export function AiRecommendations({ recommendations = mockCampusData.aiRecommendations, onExecute }) {
@@ -13,22 +13,20 @@ export function AiRecommendations({ recommendations = mockCampusData.aiRecommend
   };
 
   return (
-    <Card className="p-6 flex flex-col justify-between">
+    <Card className="p-6 flex flex-col justify-between animate-fade-in-up stagger-5 interactive-card">
       <div>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600 animate-pulse" />
               <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                Đề xuất thông minh
+                Gợi Ý Từ Nexus AI
               </h3>
-              <Badge variant="ai" size="sm">
-                <Sparkles className="w-3 h-3 text-purple-600" />
-                <span>AI</span>
-              </Badge>
+              <Badge variant="ai" size="sm">Tối ưu tự động</Badge>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Được phân tích tự động bởi Nexus AI Agent
+              Phân tích từ API /api/ai/analize
             </p>
           </div>
         </div>
@@ -37,27 +35,29 @@ export function AiRecommendations({ recommendations = mockCampusData.aiRecommend
         <div className="space-y-3 mt-4">
           {recommendations.map((rec) => {
             const isDone = executedIds[rec.id];
+            const isEnergy = rec.category === 'Năng lượng';
+
             return (
               <div
                 key={rec.id}
                 onClick={() => !isDone && handleExecute(rec.id)}
-                className={`p-4 rounded-xl border transition-all cursor-pointer select-none ${
+                className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer select-none ${
                   isDone 
-                    ? 'bg-emerald-50/60 border-emerald-200'
-                    : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-blue-300 hover:shadow-xs'
+                    ? 'bg-emerald-50/70 border-emerald-200'
+                    : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-purple-300 hover:shadow-xs hover:scale-[1.01]'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      rec.category === 'Năng lượng' 
+                      isEnergy 
                         ? 'bg-emerald-100 text-emerald-700' 
                         : 'bg-blue-100 text-blue-700'
                     }`}>
-                      {rec.category === 'Năng lượng' ? (
+                      {isEnergy ? (
                         <Leaf className="w-4 h-4" />
                       ) : (
-                        <Building2 className="w-4 h-4" />
+                        <Wrench className="w-4 h-4" />
                       )}
                     </div>
                     <div>
@@ -66,7 +66,7 @@ export function AiRecommendations({ recommendations = mockCampusData.aiRecommend
                         {rec.description}
                       </p>
                       <div className="mt-2">
-                        <span className="inline-block text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                        <span className="inline-block text-[10px] font-semibold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
                           {rec.benefit}
                         </span>
                       </div>
@@ -75,9 +75,9 @@ export function AiRecommendations({ recommendations = mockCampusData.aiRecommend
 
                   <div className="shrink-0 pt-1">
                     {isDone ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 animate-scale-in" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
                     )}
                   </div>
                 </div>
