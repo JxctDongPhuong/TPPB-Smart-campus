@@ -57,7 +57,11 @@ Dự án được xây dựng theo kiến trúc hiện đại **Monorepo**, tác
    GEMINI_API_KEY=your_gemini_api_key_here
    NEON_API_DB=postgresql://user:password@ep-xxxx.neon.tech/neondb?sslmode=require
    ```
-5. Chạy server backend:
+5. *(Tùy chọn)* Nạp dữ liệu thực tế phong phú lên Neon DB:
+   ```bash
+   python seed_neon_full.py
+   ```
+6. Chạy server backend:
    ```bash
    python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
    ```
@@ -105,7 +109,7 @@ docker compose up --build
 | **Tối ưu năng lượng AI** | `AiRecommendations.jsx` | `GET /api/ai/analyze` | ✅ Hoạt động (Gemini 3.1 Live) |
 | **Cảnh báo lãng phí điện**| `AiInsightBanner.jsx` | `GET /api/metrics/waste-alerts` | ✅ Hoạt động (Thuật toán Idle Waste) |
 | **Quản lý phòng học** | `RoomsView.jsx` | `GET /api/rooms/`, `POST`, `PUT`, `DELETE` | ✅ Hoạt động đầy đủ CRUD với Neon DB |
-| **Lịch & Mượn phòng** | `ScheduleView.jsx` | `GET /api/booking/schedule`, `requests` | ✅ Hoạt động (Tra cứu ca học & duyệt mượn) |
+| **Lịch & Mượn phòng** | `ScheduleView.jsx` | `GET /api/booking/schedule`, `requests` | ✅ Hoạt động (Hộp thoại xác nhận + chống đúp lịch) |
 | **Quản lý thiết bị** | `DevicesView.jsx` | `GET /api/devices/`, `POST /devices/batch` | ✅ Hoạt động (Quản lý kho & thêm theo lô) |
 | **Sự cố & Báo hỏng** | `TicketsView.jsx` | `GET /api/devices/reports`, `POST`, `PUT` | ✅ Hoạt động (Tiếp nhận và xử lý sự cố) |
 | **Sơ đồ không gian** | `RoomPlanView.jsx` | `GET /api/rooms/`, `devices`, `schedule` | ✅ Hoạt động (Inspector Drawer tương tác) |
@@ -115,7 +119,22 @@ docker compose up --build
 
 ---
 
-## 🔄 4. Tích Hợp CI / CD Pipeline
+## 🤖 4. Cơ Chế Xử Lý Ý Định & Gọi Hàm Của Trợ Lý AI
+
+* **Cách thức hoạt động**:
+  1. Toàn bộ câu hỏi người dùng (ví dụ: *"Tìm phòng trống sáng nay"*, *"Phòng A101 có ai học không"*, *"Báo hỏng điều hòa A202"*) được gửi thẳng tới mô hình **Gemini 3.1 Flash Lite** qua `POST /api/ai/chat`.
+  2. Kèm theo câu hỏi là danh sách khai báo công cụ (`FunctionDeclaration` trong `ai_tools.py`):
+     - `tim_phong_trong`: Tìm kiếm các phòng chưa có lịch trong ca chỉ định.
+     - `kiem_tra_lich_hoc`: Tra cứu môn học, giảng viên, lớp phụ trách.
+     - `kiem_tra_lang_phi_dien`: Rà soát phòng bật thiết bị ngoài giờ học.
+     - `bao_hong_thiet_bi`: Tự động lập phiếu báo hỏng thiết bị vào DB.
+     - `dat_phong_hoc`: Nộp đơn đăng ký mượn phòng trực tiếp.
+  3. **Không hardcode if-else**: Gemini tự phân tích ngữ nghĩa câu hỏi. Nếu nhận thấy người dùng muốn thực hiện một tác vụ nghiệp vụ, mô hình sẽ phát lệnh `function_calls` kèm tham số. Backend nhận kết quả, truy vấn trực tiếp Neon PostgreSQL và trả về câu trả lời chuẩn xác.
+  4. Nếu là câu hỏi giao tiếp thông thường (chào hỏi, giải thích quy định), mô hình phản hồi trực tiếp qua `response.text`.
+
+---
+
+## 🔄 5. Tích Hợp CI / CD Pipeline
 
 Workflow tại [.github/workflows/deploy.yaml](.github/workflows/deploy.yaml) tự động kích hoạt khi có commit lên nhánh `main`/`master`:
 1. Tự động build Docker Image cho Backend và Frontend.

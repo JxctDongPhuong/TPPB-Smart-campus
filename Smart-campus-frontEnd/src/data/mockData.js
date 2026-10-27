@@ -245,7 +245,7 @@ export const mockCampusData = {
     { ma_tb: 'TB_MC_A102', ma_loai: 'MAYCHIEU', ma_phong: 'A102', ma_lo: 'MC_01', ten_tb: 'Máy chiếu Sony Laser', cong_suat_w: 420, nam_mua: 2023, tinh_trang: 'Tốt' },
     { ma_tb: 'TB_PC_A201', ma_loai: 'MAYTINH', ma_phong: 'A201', ma_lo: 'PC_DELL', ten_tb: 'Dàn 45 PC Dell OptiPlex', cong_suat_w: 5000, nam_mua: 2024, tinh_trang: 'Tốt' },
     { ma_tb: 'TB_ML_A201', ma_loai: 'MAYLANH', ma_phong: 'A201', ma_lo: 'ML_INVERTER', ten_tb: 'Điều hòa 2.5HP Sharp', cong_suat_w: 3500, nam_mua: 2023, tinh_trang: 'Tốt' },
-    { ma_tb: 'TB_ML_A202', ma_loai: 'MAYLANH', ma_phong: 'A202', ma_lo: 'ML_PANA', ten_tb: 'Điều hòa Panasonic A202', cong_suat_w: 2500, nam_mua: 2021, tinh_trang: 'Hỏng' },
+    { ma_tb: 'TB_ML_A202', ma_loai: 'MAYLANH', ma_phong: 'A202', ma_lo: 'ML_PANA', ten_tb: 'Điều hòa Panasonic A202', cong_suat_w: 2500, nam_mua: 2021, tinh_trang: 'Tốt' },
     { ma_tb: 'TB_PC_A202', ma_loai: 'MAYTINH', ma_phong: 'A202', ma_lo: 'PC_DELL', ten_tb: 'Dàn 40 PC Dell Lab 2', cong_suat_w: 4500, nam_mua: 2023, tinh_trang: 'Tốt' },
     { ma_tb: 'TB_MC_B301', ma_loai: 'MAYCHIEU', ma_phong: 'B301', ma_lo: 'MC_EPSON', ten_tb: 'Máy chiếu Epson 5000 ANSI', cong_suat_w: 800, nam_mua: 2023, tinh_trang: 'Tốt' },
     { ma_tb: 'TB_ML_B301', ma_loai: 'MAYLANH', ma_phong: 'B301', ma_lo: 'ML_VRV', ten_tb: 'Hệ thống VRV Trung tâm B301', cong_suat_w: 6000, nam_mua: 2022, tinh_trang: 'Tốt' },

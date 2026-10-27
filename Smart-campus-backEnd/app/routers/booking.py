@@ -40,6 +40,10 @@ def create_schedule(schedule_data: LichPhongCreate, session: Session = Depends(g
     session.refresh(db_schedule)
     return db_schedule
 
+@router.delete("/schedule/{ma_lich}", summary="Xóa lịch phòng học")
+def delete_schedule(ma_lich: int, session: Session = Depends(get_session)):
+    return bookingService.delete_schedule(session, ma_lich)
+
 # ==================== 2. YÊU CẦU MƯỢN PHÒNG (YeuCauMuon) ====================
 
 @router.get("/requests", response_model=List[YeuCauMuonRead])

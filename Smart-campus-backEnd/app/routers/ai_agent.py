@@ -18,6 +18,8 @@ def chat_with_agent(payload: ChatRequest, session: Session = Depends(get_session
         message=payload.message,
         history=history_dicts,
         user_id=payload.user_id,
+        user_name=payload.user_name,
+        user_role=payload.user_role,
         model_name=payload.model
     )
     return ChatResponse(**result)

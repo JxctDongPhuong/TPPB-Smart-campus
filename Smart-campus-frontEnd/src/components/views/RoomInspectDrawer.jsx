@@ -1,26 +1,26 @@
 import React from 'react';
-import { 
-  X, 
-  Wind, 
-  Tv, 
-  Monitor, 
-  Zap, 
-  BookOpen, 
-  User, 
-  Users, 
-  Clock, 
-  CheckCircle2, 
-  Layers, 
+import {
+  X,
+  Wind,
+  Tv,
+  Monitor,
+  Zap,
+  BookOpen,
+  User,
+  Users,
+  Clock,
+  CheckCircle2,
+  Layers,
   MapPin,
   Calendar
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 
-export function RoomInspectDrawer({ 
-  room, 
-  isOpen, 
-  onClose, 
-  onNavigateToTickets 
+export function RoomInspectDrawer({
+  room,
+  isOpen,
+  onClose,
+  onNavigateToTickets
 }) {
   if (!isOpen || !room) return null;
 
@@ -196,14 +196,14 @@ export function RoomInspectDrawer({
   return (
     <div className="fixed inset-0 lg:left-64 z-40 overflow-hidden animate-fade-in pointer-events-none">
       {/* 1. Backdrop: chỉ phủ vùng làm việc, KHÔNG che phủ Sidebar (Chức năng quản lý ở hình 2 luôn ở trên) */}
-      <div 
+      <div
         className="fixed inset-0 lg:left-64 bg-slate-900/35 backdrop-blur-2xs transition-opacity cursor-pointer pointer-events-auto"
         onClick={onClose}
       />
 
       {/* 2. Slide-out Right Drawer Panel (~32% - 35% trên desktop) */}
       <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[480px] lg:w-[38%] xl:w-[32%] bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 ease-out pointer-events-auto">
-        
+
         {/* Drawer Header */}
         <div className="p-4 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-2xs">
           <div className="min-w-0">
@@ -211,20 +211,19 @@ export function RoomInspectDrawer({
               <h3 className="font-extrabold text-sm text-slate-900 truncate">
                 {room.ten_phong || `Phòng ${roomId}`}
               </h3>
-                <Badge 
-                  variant={room.trang_thai === 'Đang dùng' ? 'success' : room.trang_thai === 'Bảo trì' ? 'danger' : 'primary'} 
-                  size="sm"
-                >
-                  {room.trang_thai || 'Sẵn sàng'}
-                </Badge>
-              </div>
-              <p className="text-[11px] text-slate-500 truncate">
-                Tòa {room.toa || 'A'} • Tầng {room.tang || 1} • {room.loai_phong || 'Phòng học'} ({room.dien_tich || 65} m²)
-              </p>
+              <Badge
+                variant={room.trang_thai === 'Đang dùng' ? 'success' : room.trang_thai === 'Bảo trì' ? 'danger' : 'primary'}
+                size="sm"
+              >
+                {room.trang_thai || 'Sẵn sàng'}
+              </Badge>
             </div>
+            <p className="text-[11px] text-slate-500 truncate">
+              Tòa {room.toa || 'A'} • Tầng {room.tang || 1} • {room.loai_phong || 'Phòng học'} ({room.dien_tich || 65} m²)
+            </p>
           </div>
 
-          <button 
+          <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
             title="Đóng panel"
@@ -235,7 +234,7 @@ export function RoomInspectDrawer({
 
         {/* Drawer Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          
+
           {/* MỤC 1: THÔNG TIN TIẾT HỌC */}
           <div className="bg-gradient-to-br from-white to-blue-50/50 p-4 rounded-2xl border border-blue-200/80 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between pb-2 border-b border-blue-100">
@@ -341,9 +340,7 @@ export function RoomInspectDrawer({
               })}
             </div>
           </div>
-
         </div>
-
       </aside>
     </div>
   );

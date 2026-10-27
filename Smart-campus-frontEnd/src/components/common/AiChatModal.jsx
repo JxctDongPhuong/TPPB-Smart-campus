@@ -3,10 +3,20 @@ import { X, Sparkles, Send, Bot, User, RotateCw } from 'lucide-react';
 import { campusApi } from '../../services/api';
 
 export function AiChatModal({ isOpen, onClose }) {
-  const [messages, setMessages] = useState([
+  const getCurrentUser = () => {
+    try {
+      const stored = localStorage.getItem('campus_current_user');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return { name: 'Ban Quản Lý CSVC', role: 'Ban Quản Lý Campus (Admin)', ma_tk: 1 };
+  };
+
+  const currentUser = getCurrentUser();
+
+  const [messages, setMessages] = useState(() => [
     {
       sender: 'bot',
-      text: 'Xin chào Trang! Tôi là Nexus AI Copilot - Trợ lý vận hành cơ sở thông minh. Tôi có thể giúp bạn kiểm tra trạng thái phòng học, phân tích tải điện hoặc điều khiển thiết bị tự động. Bạn cần hỗ trợ gì hôm nay?'
+      text: `Xin chào ${currentUser.name}! Tôi là Nexus AI Copilot. Với vai trò ${currentUser.role}, bạn có thể yêu cầu tôi kiểm tra phòng trống, tạo đơn mượn phòng, tra cứu sự cố hoặc phân tích lãng phí điện. Bạn cần hỗ trợ gì hôm nay?`
     }
   ]);
   const [input, setInput] = useState('');
@@ -25,7 +35,12 @@ export function AiChatModal({ isOpen, onClose }) {
     setLoading(true);
 
     try {
-      const res = await campusApi.sendAiChat(userMsg, newMsgList);
+      const user = getCurrentUser();
+      const res = await campusApi.sendAiChat(userMsg, newMsgList, {
+        user_id: user.ma_tk || 1,
+        user_name: user.name,
+        user_role: user.role
+      });
       setMessages(prev => [
         ...prev, 
         { 
@@ -34,6 +49,9 @@ export function AiChatModal({ isOpen, onClose }) {
           action_taken: res.action_taken
         }
       ]);
+      if (res.action_taken === 'tao_yeu_cau_muon_phong') {
+        window.dispatchEvent(new CustomEvent('campus_booking_created', { detail: res.data }));
+      }
     } catch {
       setMessages(prev => [
         ...prev, 

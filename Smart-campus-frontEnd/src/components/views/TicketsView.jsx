@@ -22,7 +22,6 @@ import { Card, CardHeader, CardContent } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
 const STATUS_CONFIG = {
   Moi: { label: 'Mới tiếp nhận', variant: 'warning', icon: AlertTriangle },
@@ -31,14 +30,20 @@ const STATUS_CONFIG = {
   TuChoi: { label: 'Từ chối', variant: 'danger', icon: XCircle }
 };
 
-export function TicketsView() {
+export function TicketsView({ searchQuery = '' }) {
   const [reports, setReports] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('ALL');
-  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('PENDING'); // 'PENDING' | 'Moi' | 'DangXuLy' | 'DaXuLy' | 'ALL'
+  const [search, setSearch] = useState(searchQuery);
   const [expandedTicketIds, setExpandedTicketIds] = useState([1]);
+
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== null) {
+      setSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -67,13 +72,14 @@ export function TicketsView() {
         campusApi.getAllRoomsList(),
         campusApi.getAllDevicesList()
       ]);
-      setReports(reps?.length ? reps : mockCampusData.allReports);
-      setRooms(rms?.length ? rms : mockCampusData.allRooms);
-      setDevices(devs?.length ? devs : mockCampusData.allDevices);
-    } catch {
-      setReports(mockCampusData.allReports);
-      setRooms(mockCampusData.allRooms);
-      setDevices(mockCampusData.allDevices);
+      setReports(Array.isArray(reps) ? reps : []);
+      setRooms(Array.isArray(rms) ? rms : []);
+      setDevices(Array.isArray(devs) ? devs : []);
+    } catch (err) {
+      console.error('[TicketsView] Lỗi tải phiếu báo hỏng:', err);
+      setReports([]);
+      setRooms([]);
+      setDevices([]);
     } finally {
       setLoading(false);
     }
@@ -81,14 +87,45 @@ export function TicketsView() {
 
   useEffect(() => {
     loadData();
+
+    const handleCreated = (e) => {
+      if (e.detail) {
+        setReports(prev => [e.detail, ...prev.filter(r => String(r.ma_phieu || r.id) !== String(e.detail.ma_phieu || e.detail.id))]);
+      }
+    };
+
+    const handleUpdated = (e) => {
+      if (e.detail) {
+        setReports(prev => prev.map(r => String(r.ma_phieu || r.id) === String(e.detail.ma_phieu || e.detail.id) ? { ...r, ...e.detail } : r));
+      }
+    };
+
+    window.addEventListener('campus_report_created', handleCreated);
+    window.addEventListener('campus_report_updated', handleUpdated);
+
+    return () => {
+      window.removeEventListener('campus_report_created', handleCreated);
+      window.removeEventListener('campus_report_updated', handleUpdated);
+    };
   }, []);
 
-  // Filter
+  // Filter: Ở chế độ mặc định PENDING, chỉ hiển thị phiếu CẦN XỬ LÝ (Mới, Đang xử lý). 
+  // Phiếu sau khi Đã xử lý (DaXuLy) sẽ tự động biến mất khỏi danh sách chính!
   const filteredReports = reports.filter(r => {
-    const matchStatus = activeFilter === 'ALL' || r.trang_thai === activeFilter;
-    const matchSearch = (r.mo_ta || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.ma_phong || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.ma_tb || '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus = activeFilter === 'ALL' 
+      ? true 
+      : activeFilter === 'PENDING'
+      ? (r.trang_thai === 'Moi' || r.trang_thai === 'DangXuLy')
+      : r.trang_thai === activeFilter;
+    const q = (search || '').trim().toLowerCase();
+    const matchSearch = !q ||
+                        (r.mo_ta || '').toLowerCase().includes(q) ||
+                        (r.ma_phong || '').toLowerCase().includes(q) ||
+                        (`phòng ${r.ma_phong || ''}`).toLowerCase().includes(q) ||
+                        (r.ma_tb || '').toLowerCase().includes(q) ||
+                        (r.nguoi_gui || '').toLowerCase().includes(q) ||
+                        (r.ghi_chu_admin || '').toLowerCase().includes(q) ||
+                        (String(r.id || r.ma_phieu || '')).includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -109,7 +146,7 @@ export function TicketsView() {
     setIsProcessModalOpen(true);
   };
 
-  // Cập nhật tiến độ xử lý
+  // Cập nhật tiến độ xử lý: Sau khi xử lý xong (DaXuLy), phiếu tự động biến mất khỏi màn hình chờ
   const handleSaveProcess = async (e) => {
     e.preventDefault();
     const updatePayload = {
@@ -120,9 +157,9 @@ export function TicketsView() {
     };
 
     await campusApi.updateReport(selectedReport.ma_phieu, updatePayload);
-    setReports(prev => prev.map(r => r.ma_phieu === selectedReport.ma_phieu ? { ...r, ...updatePayload } : r));
     setIsProcessModalOpen(false);
-    alert('Đã cập nhật tiến độ xử lý phiếu báo hỏng thành công!');
+    await loadData();
+    alert('Đã cập nhật tiến độ và hoàn tất phiếu sự cố thành công!');
   };
 
   // Tạo phiếu mới
@@ -203,10 +240,11 @@ export function TicketsView() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[
-              { id: 'ALL', label: 'Tất cả phiếu' },
+              { id: 'PENDING', label: `Cần xử lý (${moiCount + inProgressCount})` },
               { id: 'Moi', label: `Mới (${moiCount})` },
-              { id: 'DangXuLy', label: `Đang xử lý (${inProgressCount})` },
-              { id: 'DaXuLy', label: `Đã hoàn tất (${resolvedCount})` }
+              { id: 'DangXuLy', label: `Đang sửa (${inProgressCount})` },
+              { id: 'DaXuLy', label: `Đã hoàn tất (${resolvedCount})` },
+              { id: 'ALL', label: `Tất cả (${totalReports})` }
             ].map(tab => (
               <button
                 key={tab.id}

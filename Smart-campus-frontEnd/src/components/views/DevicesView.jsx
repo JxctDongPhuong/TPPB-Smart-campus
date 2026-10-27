@@ -17,13 +17,13 @@ import {
   FileWarning,
   ChevronDown,
   ChevronRight,
-  ArrowUpDown
+  ArrowUpDown,
+  Inbox
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
 const TYPE_CONFIG = {
   MAYLANH: { label: 'Máy điều hòa', icon: Wind, color: 'text-emerald-600 bg-emerald-50' },
@@ -32,16 +32,22 @@ const TYPE_CONFIG = {
   QUAT: { label: 'Quạt thông gió', icon: Wind, color: 'text-sky-600 bg-sky-50' }
 };
 
-export function DevicesView({ onNavigateToTickets }) {
+export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
   const [devices, setDevices] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchQuery);
   const [filterType, setFilterType] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterRoom, setFilterRoom] = useState('ALL');
   // Row 1 expanded by default (matching Image 4)
   const [expandedRowKeys, setExpandedRowKeys] = useState(['MAYLANH']);
+
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== null) {
+      setSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -82,11 +88,12 @@ export function DevicesView({ onNavigateToTickets }) {
         campusApi.getAllDevicesList(),
         campusApi.getAllRoomsList()
       ]);
-      setDevices(devs?.length ? devs : mockCampusData.allDevices);
-      setRooms(rms?.length ? rms : mockCampusData.allRooms);
-    } catch {
-      setDevices(mockCampusData.allDevices);
-      setRooms(mockCampusData.allRooms);
+      setDevices(Array.isArray(devs) ? devs : []);
+      setRooms(Array.isArray(rms) ? rms : []);
+    } catch (err) {
+      console.error('[DevicesView] Lỗi tải thiết bị:', err);
+      setDevices([]);
+      setRooms([]);
     } finally {
       setLoading(false);
     }
@@ -94,14 +101,41 @@ export function DevicesView({ onNavigateToTickets }) {
 
   useEffect(() => {
     loadData();
+
+    const handleReportUpdated = (e) => {
+      if (e.detail) {
+        const { ma_tb, trang_thai } = e.detail;
+        if (ma_tb && (trang_thai === 'DaXuLy' || trang_thai === 'TuChoi')) {
+          setDevices(prev => prev.map(d => d.ma_tb === ma_tb ? { ...d, tinh_trang: 'Tốt' } : d));
+        } else if (ma_tb && trang_thai === 'DangXuLy') {
+          setDevices(prev => prev.map(d => d.ma_tb === ma_tb ? { ...d, tinh_trang: 'Đang sửa' } : d));
+        } else {
+          loadData();
+        }
+      }
+    };
+
+    window.addEventListener('campus_report_created', loadData);
+    window.addEventListener('campus_report_updated', handleReportUpdated);
+
+    return () => {
+      window.removeEventListener('campus_report_created', loadData);
+      window.removeEventListener('campus_report_updated', handleReportUpdated);
+    };
   }, []);
 
-  // Filter
+  // Filter dynamic
   const filteredDevices = devices.filter(d => {
     if (d.da_xoa) return false;
-    const matchSearch = (d.ma_tb || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (d.ten_tb || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (d.ma_lo || '').toLowerCase().includes(search.toLowerCase());
+    const q = (search || '').trim().toLowerCase();
+    const matchSearch = !q ||
+                        (d.ma_tb || '').toLowerCase().includes(q) ||
+                        (d.ten_tb || '').toLowerCase().includes(q) ||
+                        (d.ma_lo || '').toLowerCase().includes(q) ||
+                        (d.ma_phong || '').toLowerCase().includes(q) ||
+                        (`phòng ${d.ma_phong || ''}`).toLowerCase().includes(q) ||
+                        (d.ma_loai || '').toLowerCase().includes(q) ||
+                        (d.tinh_trang || '').toLowerCase().includes(q);
     const matchType = filterType === 'ALL' || d.ma_loai === filterType;
     const matchStatus = filterStatus === 'ALL' || d.tinh_trang === filterStatus;
     const matchRoom = filterRoom === 'ALL' || (filterRoom === 'KHO' ? !d.ma_phong : d.ma_phong === filterRoom);
@@ -150,7 +184,11 @@ export function DevicesView({ onNavigateToTickets }) {
 
   // Mở modal gửi báo hỏng cho thiết bị này
   const handleOpenReportModal = (dev) => {
-    setSelectedDeviceForReport(dev);
+    const cleanRoom = dev.ma_phong ? String(dev.ma_phong).replace(/^Phòng\s*/i, '').trim() : '';
+    setSelectedDeviceForReport({
+      ...dev,
+      ma_phong: cleanRoom
+    });
     setReportForm({
       mo_ta: `Thiết bị ${dev.ten_tb} (${dev.ma_tb}) gặp sự cố: `,
       muc_do: 'TrungBinh'
@@ -163,9 +201,18 @@ export function DevicesView({ onNavigateToTickets }) {
     e.preventDefault();
     if (!reportForm.mo_ta) return alert('Vui lòng nhập mô tả sự cố!');
 
+    let cleanRoom = selectedDeviceForReport.ma_phong || '';
+    if (typeof cleanRoom === 'string') {
+      cleanRoom = cleanRoom.replace(/^Phòng\s*/i, '').trim();
+    }
+    if (!cleanRoom || cleanRoom.toLowerCase().includes('kho') || cleanRoom.toLowerCase().includes('depot')) {
+      cleanRoom = 'A101';
+    }
+
     await campusApi.submitReport({
-      ma_phong: selectedDeviceForReport.ma_phong || 'KHO',
+      ma_phong: cleanRoom,
       ma_tb: selectedDeviceForReport.ma_tb,
+      ten_tb: selectedDeviceForReport.ten_tb,
       mo_ta: reportForm.mo_ta,
       muc_do: reportForm.muc_do
     });
@@ -173,7 +220,7 @@ export function DevicesView({ onNavigateToTickets }) {
     // Cập nhật tình trạng thiết bị thành "Đang sửa"
     setDevices(prev => prev.map(d => d.ma_tb === selectedDeviceForReport.ma_tb ? { ...d, tinh_trang: 'Đang sửa' } : d));
     setIsReportModalOpen(false);
-    alert('Đã tạo phiếu báo hỏng thành công và chuyển trạng thái thiết bị sang Đang sửa!');
+    alert('Đã tạo phiếu báo hỏng thành công và đồng bộ sang danh sách Phiếu Báo Cáo Sự Cố!');
   };
 
   return (
@@ -181,14 +228,7 @@ export function DevicesView({ onNavigateToTickets }) {
       {/* 1. Header with concise 3-word title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Cơ sở dữ liệu ThietBi</span>
-          </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản lý thiết bị</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Bảng điều phối tài sản giảng đường, quản lý tồn kho và tiếp nhận thông tin báo hỏng.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -368,223 +408,59 @@ export function DevicesView({ onNavigateToTickets }) {
             </thead>
             <tbody className="divide-y divide-slate-200 font-normal text-slate-800">
               {(() => {
-                // Nhóm danh mục thiết bị theo chuẩn master-detail với thông số Hạn bảo hành
-                const catalogItems = [
-                  {
-                    key: 'MAYLANH',
-                    code: '313-DO-11-0010',
-                    name: 'Điều hòa Daikin Inverter 2.5HP',
-                    bin: 'HB_DEPOT',
-                    dvt: 'BO',
-                    seri: 'Không',
-                    totalQty: 233,
-                    warranty: '24 Tháng (12/2026)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Phòng A101', lot: 'ML_01', qty: 7, devId: 'TB_ML_A101' },
-                      { status: 'Hoạt động', location: 'Phòng A102', lot: 'ML_02', qty: 226, devId: 'TB_ML_A102' }
-                    ]
-                  },
-                  {
-                    key: '372-VN-11-0001',
-                    code: '372-VN-11-0001',
-                    name: 'Dàn máy tính Dell OptiPlex Lab',
-                    bin: 'HB_DEPOT',
-                    dvt: 'BO',
-                    seri: 'Không',
-                    totalQty: 49,
-                    warranty: '36 Tháng (08/2027)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Phòng Lab 1 (A201)', lot: 'PC_DELL_A201', qty: 45, devId: 'TB_PC_A201' },
-                      { status: 'Hoạt động', location: 'Kho dự phòng', lot: 'PC_STOCK', qty: 4, devId: 'TB_PC_STOCK' }
-                    ]
-                  },
-                  {
-                    key: 'NSR-16-10-01',
-                    code: 'NSR-16-10-01',
-                    name: 'Máy chiếu Sony Laser 4K',
-                    bin: 'HB_DEPOT',
-                    dvt: 'BO1',
-                    seri: 'Không',
-                    totalQty: 45,
-                    warranty: '24 Tháng (10/2026)',
-                    warrantyExpired: false,
-                    pending: 4,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Phòng A101', lot: 'MC_PANASONIC', qty: 1, devId: 'TB_MC_A101' },
-                      { status: 'Hoạt động', location: 'Phòng A102', lot: 'MC_SONY', qty: 1, devId: 'TB_MC_A102' },
-                      { status: 'Báo hỏng', location: 'Phòng A202', lot: 'ML_PANA_A202', qty: 1, devId: 'TB_ML_A202' }
-                    ]
-                  },
-                  {
-                    key: '000-00-17-1999',
-                    code: '000-00-17-1999',
-                    name: 'Quạt thông gió Senko 45W',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 2,
-                    warranty: '12 Tháng (Hết hạn)',
-                    warrantyExpired: true,
-                    pending: 2,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Tầng 1 Tòa A', lot: 'QT_SENKO_01', qty: 1, devId: 'TB_QT_01' },
-                      { status: 'Đang sửa', location: 'Tầng 2 Tòa A', lot: 'QT_SENKO_02', qty: 1, devId: 'TB_QT_02' }
-                    ]
-                  },
-                  {
-                    key: '464-CN-10-0002',
-                    code: '464-CN-10-0002',
-                    name: 'Máy tính thực hành Lab 2',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Có',
-                    totalQty: 7,
-                    warranty: '36 Tháng (05/2027)',
-                    warrantyExpired: false,
-                    pending: 1,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Phòng Lab 2 (A202)', lot: 'PC_DELL_A202', qty: 40, devId: 'TB_PC_A202' }
-                    ]
-                  },
-                  {
-                    key: '911-DE-12-0001',
-                    code: '911-DE-12-0001',
-                    name: 'Cáp tín hiệu HDMI / VGA',
-                    bin: 'HANGHONG',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 9,
-                    warranty: '12 Tháng (01/2026)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Kho phụ kiện', lot: 'CAP_HDMI_4K', qty: 9, devId: 'TB_CAP_01' }
-                    ]
-                  },
-                  {
-                    key: '732-IN-11-0079',
-                    code: '732-IN-11-0079',
-                    name: 'Máy chiếu Epson hội trường',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 8,
-                    warranty: '24 Tháng (11/2026)',
-                    warrantyExpired: false,
-                    pending: 1,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Hội trường B301', lot: 'MC_EPSON', qty: 1, devId: 'TB_MC_B301' }
-                    ]
-                  },
-                  {
-                    key: '372-VN-11-0710',
-                    code: '372-VN-11-0710',
-                    name: 'Hệ thống điều hòa trung tâm',
-                    bin: 'HB_DEPOT',
-                    dvt: 'BO',
-                    seri: 'Không',
-                    totalQty: 99,
-                    warranty: '36 Tháng (03/2027)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Hội trường B301', lot: 'ML_CENTER', qty: 1, devId: 'TB_ML_B301' },
-                      { status: 'Hoạt động', location: 'Phòng họp B302', lot: 'ML_B302', qty: 1, devId: 'TB_ML_B302' }
-                    ]
-                  },
-                  {
-                    key: 'SR-03-12-00',
-                    code: 'SR-03-12-00',
-                    name: 'Công tơ điện tử thông minh IoT',
-                    bin: 'S27',
-                    dvt: 'CAI',
-                    seri: 'Có',
-                    totalQty: 3,
-                    warranty: '24 Tháng (09/2026)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Tủ điện Tòa A', lot: 'IOT_METER_01', qty: 3, devId: 'TB_IOT_01' }
-                    ]
-                  },
-                  {
-                    key: 'SR-03-12-00-D',
-                    code: 'SR-03-12-00-D',
-                    name: 'Cảm biến dòng tải điều hòa',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Có',
-                    totalQty: 10,
-                    warranty: '24 Tháng (09/2026)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Kho vật tư', lot: 'IOT_SENSOR_02', qty: 10, devId: 'TB_IOT_02' }
-                    ]
-                  },
-                  {
-                    key: '101-DE-14-0008',
-                    code: '101-DE-14-0008',
-                    name: 'Bộ vệ sinh máy chiếu & dàn lạnh',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 11,
-                    warranty: '6 Tháng (Hết hạn)',
-                    warrantyExpired: true,
-                    pending: 1,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Kho CSVC', lot: 'TOOL_CLEAN', qty: 11, devId: 'TB_CLEAN_01' }
-                    ]
-                  },
-                  {
-                    key: '101-DE-12-0035',
-                    code: '101-DE-12-0035',
-                    name: 'Bộ cọ vệ sinh vi mạch Lab',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 29,
-                    warranty: '6 Tháng (Hết hạn)',
-                    warrantyExpired: true,
-                    pending: 1,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Kho CSVC', lot: 'TOOL_PC', qty: 29, devId: 'TB_CLEAN_02' }
-                    ]
-                  },
-                  {
-                    key: '101-DE-11-0014',
-                    code: '101-DE-11-0014',
-                    name: 'Kẹp cố định dây cáp bàn học',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 0,
-                    warranty: 'Chưa kích hoạt',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: []
-                  },
-                  {
-                    key: '101-GB-15-0001',
-                    code: '101-GB-15-0001',
-                    name: 'Màng lọc bụi mịn điều hòa',
-                    bin: 'HB_DEPOT',
-                    dvt: 'CAI',
-                    seri: 'Không',
-                    totalQty: 1500,
-                    warranty: '12 Tháng (02/2026)',
-                    warrantyExpired: false,
-                    pending: 0,
-                    subRows: [
-                      { status: 'Hoạt động', location: 'Kho vật tư CS1', lot: 'FILTER_2024', qty: 1500, devId: 'TB_FILTER_01' }
-                    ]
+                // Nhóm danh mục thiết bị động từ danh sách filteredDevices
+                const catalogMap = new Map();
+
+                filteredDevices.forEach(d => {
+                  const groupKey = d.ma_loai || 'KHAC';
+                  if (!catalogMap.has(groupKey)) {
+                    const typeLabel = TYPE_CONFIG[groupKey]?.label || groupKey;
+                    catalogMap.set(groupKey, {
+                      key: groupKey,
+                      code: d.ma_lo || groupKey,
+                      name: d.ten_tb ? `${typeLabel} - ${d.ten_tb}` : typeLabel,
+                      bin: d.ma_phong ? `PHONG_${d.ma_phong}` : 'HB_DEPOT',
+                      dvt: 'BỘ',
+                      seri: 'Có',
+                      totalQty: 0,
+                      warranty: d.nam_mua ? `24 Tháng (${d.nam_mua + 2})` : '24 Tháng (12/2026)',
+                      warrantyExpired: d.nam_mua ? (d.nam_mua + 2 < 2026) : false,
+                      pending: 0,
+                      subRows: []
+                    });
                   }
-                ];
+
+                  const group = catalogMap.get(groupKey);
+                  group.totalQty += 1;
+                  const isBroken = d.tinh_trang === 'Hỏng';
+                  const isRepairing = d.tinh_trang === 'Đang sửa';
+                  if (isBroken || isRepairing) {
+                    group.pending += 1;
+                  }
+
+                  group.subRows.push({
+                    devId: d.ma_tb,
+                    rawRoom: d.ma_phong,
+                    location: d.ma_phong ? `Phòng ${d.ma_phong}` : 'Kho dự phòng',
+                    lot: d.ma_lo || d.ma_tb,
+                    qty: 1,
+                    status: isBroken ? 'Báo hỏng' : isRepairing ? 'Đang sửa' : 'Hoạt động',
+                    tinh_trang: d.tinh_trang
+                  });
+                });
+
+                const catalogItems = Array.from(catalogMap.values());
+
+                if (catalogItems.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <span>Không tìm thấy thiết bị nào khớp với từ khóa tìm kiếm hoặc bộ lọc hiện tại.</span>
+                      </td>
+                    </tr>
+                  );
+                }
 
                 const toggleExpand = (rowKey) => {
                   setExpandedRowKeys(prev => 
@@ -593,7 +469,7 @@ export function DevicesView({ onNavigateToTickets }) {
                 };
 
                 return catalogItems.map((item) => {
-                  const isExpanded = expandedRowKeys.includes(item.key);
+                  const isExpanded = search.trim() ? true : expandedRowKeys.includes(item.key);
                   return (
                     <React.Fragment key={item.key}>
                       {/* Master Row */}
@@ -668,15 +544,21 @@ export function DevicesView({ onNavigateToTickets }) {
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
+                                              if (isBroken || isRepairing) {
+                                                if (onNavigateToTickets) {
+                                                  onNavigateToTickets();
+                                                  return;
+                                                }
+                                              }
                                               handleOpenReportModal({
                                                 ma_tb: sub.devId || sub.lot,
                                                 ten_tb: item.name,
-                                                ma_phong: sub.location
+                                                ma_phong: sub.rawRoom || ''
                                               });
                                             }}
                                             className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
                                           >
-                                            {isBroken ? 'Xem lỗi' : 'Báo hỏng'}
+                                            {isBroken || isRepairing ? 'Xem phiếu lỗi' : 'Báo hỏng'}
                                           </button>
                                         </td>
                                       </tr>
@@ -930,7 +812,7 @@ export function DevicesView({ onNavigateToTickets }) {
             <form onSubmit={handleSubmitReport} className="p-6 space-y-4">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
                 <p className="font-bold text-slate-800">{selectedDeviceForReport.ten_tb}</p>
-                <p className="text-slate-500 font-mono">Mã TB: {selectedDeviceForReport.ma_tb} • Vị trí: Phòng {selectedDeviceForReport.ma_phong || 'Trong kho'}</p>
+                <p className="text-slate-500 font-mono">Mã TB: {selectedDeviceForReport.ma_tb} • Vị trí: {selectedDeviceForReport.ma_phong ? `Phòng ${selectedDeviceForReport.ma_phong}` : 'Trong kho'}</p>
               </div>
 
               <div>

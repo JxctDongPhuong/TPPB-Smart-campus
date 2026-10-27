@@ -37,6 +37,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
   const [accounts, setAccounts] = useState([
     {
       id: 'ql-1',
+      ma_tk: 1,
       name: 'Lê Khánh Nam',
       email: 'khanhnam.ql@campus.edu.vn',
       role: 'Ban Quản Lý Campus (Admin)',
@@ -46,15 +47,27 @@ export function UserAccountMenu({ isOpen, onClose }) {
     },
     {
       id: 'gv-1',
-      name: 'ThS. Nguyễn Văn A',
-      email: 'nguyenvana.gv@campus.edu.vn',
+      ma_tk: 2,
+      name: 'TS. Nguyễn Văn Hùng',
+      email: 'nguyenvanhung.gv@campus.edu.vn',
       role: 'Giảng viên Khoa CNTT',
       avatarText: 'GV',
       avatarBg: 'bg-blue-600',
       isActive: false
     },
     {
+      id: 'sv-1',
+      ma_tk: 4,
+      name: 'Đặng Minh Trang',
+      email: 'minhtrang.sv@campus.edu.vn',
+      role: 'Sinh viên',
+      avatarText: 'SV',
+      avatarBg: 'bg-amber-600',
+      isActive: false
+    },
+    {
       id: 'kt-1',
+      ma_tk: 3,
       name: 'Trần Minh Tuấn',
       email: 'tuan.ktv@campus.edu.vn',
       role: 'Kỹ thuật viên Thiết bị & Điện',
@@ -65,6 +78,17 @@ export function UserAccountMenu({ isOpen, onClose }) {
   ]);
 
   const currentAccount = accounts.find(a => a.isActive) || accounts[0];
+
+  // Lưu tài khoản hiện tại vào localStorage để Nexus AI Copilot nhận diện vai trò
+  useEffect(() => {
+    localStorage.setItem('campus_current_user', JSON.stringify({
+      id: currentAccount.id,
+      ma_tk: currentAccount.ma_tk || (currentAccount.id === 'gv-1' ? 2 : currentAccount.id === 'sv-1' ? 4 : 1),
+      name: currentAccount.name,
+      email: currentAccount.email,
+      role: currentAccount.role
+    }));
+  }, [currentAccount]);
 
   // Đảm bảo class 'dark' được áp dụng chuẩn xác trên html tag
   useEffect(() => {

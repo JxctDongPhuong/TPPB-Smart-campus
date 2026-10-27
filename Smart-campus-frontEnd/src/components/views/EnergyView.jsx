@@ -19,11 +19,19 @@ import { Card, CardHeader, CardContent } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
 export function EnergyView() {
   const [metrics, setMetrics] = useState([]);
-  const [summary, setSummary] = useState(mockCampusData.summary);
+  const [summary, setSummary] = useState({
+    totalRooms: 0,
+    roomsOccupied: 0,
+    roomsAvailable: 0,
+    totalKWh: 0,
+    averageKWhPerRoom: 0,
+    activeReports: 0,
+    wasteAlertsCount: 0,
+    systemStatus: 'Ổn định'
+  });
   const [wasteAlerts, setWasteAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -152,12 +160,13 @@ export function EnergyView() {
         campusApi.getSummary(),
         campusApi.getWasteAlerts()
       ]);
-      setMetrics(metricsRes?.length ? metricsRes : mockCampusData.allEnergyMetrics);
+      setMetrics(Array.isArray(metricsRes) ? metricsRes : []);
       if (sumRes) setSummary(sumRes);
-      setWasteAlerts(wasteRes?.length ? wasteRes : [mockCampusData.aiWasteAlert]);
-    } catch {
-      setMetrics(mockCampusData.allEnergyMetrics);
-      setWasteAlerts([mockCampusData.aiWasteAlert]);
+      setWasteAlerts(Array.isArray(wasteRes) ? wasteRes : []);
+    } catch (err) {
+      console.error('[EnergyView] Lỗi tải dữ liệu điện năng:', err);
+      setMetrics([]);
+      setWasteAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -195,14 +204,7 @@ export function EnergyView() {
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Hệ thống Giám sát Điện năng DienNang</span>
-          </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Giám sát điện</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Phân tích số liệu tiêu thụ kWh theo ngày, phát hiện lãng phí ngoài giờ học (Idle Waste) bằng thuật toán thông minh.
-          </p>
         </div>
 
         <Button 

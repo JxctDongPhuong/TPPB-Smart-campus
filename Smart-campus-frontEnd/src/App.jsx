@@ -18,16 +18,30 @@ import { EnergyView } from './components/views/EnergyView';
 import { TicketsView } from './components/views/TicketsView';
 import { RoomPlanView } from './components/views/RoomPlanView';
 import { campusApi } from './services/api';
-import { mockCampusData } from './data/mockData';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('rooms');
-  const [summary, setSummary] = useState(mockCampusData.summary);
-  const [rooms, setRooms] = useState(mockCampusData.floorRooms);
+  const [summary, setSummary] = useState({
+    totalRooms: 0,
+    roomsOccupied: 0,
+    roomsAvailable: 0,
+    totalKWh: 0,
+    averageKWhPerRoom: 0,
+    activeReports: 0,
+    wasteAlertsCount: 0,
+    systemStatus: 'Trực tuyến'
+  });
+  const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState('A101');
-  const [selectedRoomDetail, setSelectedRoomDetail] = useState(mockCampusData.floorRooms[0]);
-  const [wasteAlert, setWasteAlert] = useState(mockCampusData.aiWasteAlert);
-  const [alerts, setAlerts] = useState(mockCampusData.recentAlerts);
+  const [selectedRoomDetail, setSelectedRoomDetail] = useState(null);
+  const [wasteAlert, setWasteAlert] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [deviceStats, setDeviceStats] = useState({
+    goodCount: 13,
+    totalCount: 14,
+    brokenCount: 1,
+    pendingTicketsCount: 1
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,18 +51,42 @@ export default function App() {
   const loadData = async () => {
     setIsRefreshing(true);
     try {
-      const [sumRes, roomsRes, wasteRes, alertsRes] = await Promise.all([
+      const [sumRes, roomsRes, wasteRes, alertsRes, devsRes, repsRes] = await Promise.all([
         campusApi.getSummary(),
-        campusApi.getRooms('A', 1),
+        campusApi.getAllRoomsList(),
         campusApi.getWasteAlerts(),
-        campusApi.getAlerts()
+        campusApi.getAlerts(),
+        campusApi.getAllDevicesList(),
+        campusApi.getAllReports()
       ]);
       if (sumRes) setSummary(sumRes);
-      if (roomsRes?.length) setRooms(roomsRes);
-      if (wasteRes?.length) setWasteAlert(wasteRes[0]);
-      if (alertsRes?.length) setAlerts(alertsRes);
+      if (roomsRes && roomsRes.length) {
+        setRooms(roomsRes);
+        const defaultRoom = roomsRes[0];
+        setSelectedRoomId(defaultRoom.ma_phong);
+        handleSelectRoom(defaultRoom.ma_phong, roomsRes);
+      }
+      if (wasteRes && wasteRes.length) setWasteAlert(wasteRes[0]);
+      else setWasteAlert(null);
+      if (alertsRes && alertsRes.length) setAlerts(alertsRes);
+
+      if (Array.isArray(devsRes) && devsRes.length) {
+        const total = devsRes.length;
+        const broken = devsRes.filter(d => d.tinh_trang === 'Hỏng').length;
+        const good = total - broken;
+        const pendingTickets = Array.isArray(repsRes) 
+          ? repsRes.filter(r => r.trang_thai === 'Moi' || r.trang_thai === 'DangXuLy').length 
+          : 0;
+
+        setDeviceStats({
+          goodCount: good,
+          totalCount: total,
+          brokenCount: broken,
+          pendingTicketsCount: pendingTickets
+        });
+      }
     } catch (e) {
-      console.warn('API error or fallback:', e);
+      console.warn('API error:', e);
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
     }
@@ -56,15 +94,33 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-    handleSelectRoom('A101');
+
+    const handleSync = () => {
+      loadData();
+    };
+
+    window.addEventListener('campus_report_created', handleSync);
+    window.addEventListener('campus_report_updated', handleSync);
+
+    return () => {
+      window.removeEventListener('campus_report_created', handleSync);
+      window.removeEventListener('campus_report_updated', handleSync);
+    };
   }, []);
 
   // Handle selecting a room on the floor plan
-  const handleSelectRoom = async (roomId) => {
+  const handleSelectRoom = async (roomId, currentRooms = rooms) => {
     setSelectedRoomId(roomId);
     
-    // Find base room object from state or mock
-    const baseRoom = rooms.find(r => (r.ma_phong || r.id) === roomId) || mockCampusData.floorRooms.find(r => r.ma_phong === roomId);
+    // Find base room object from state
+    const baseRoom = currentRooms.find(r => (r.ma_phong || r.id) === roomId) || {
+      ma_phong: roomId,
+      toa: roomId ? roomId.charAt(0) : 'A',
+      tang: 1,
+      loai_phong: 'Phòng học',
+      suc_chua: 40,
+      trang_thai: 'Sẵn sàng'
+    };
     
     try {
       const [devices, schedule, metric] = await Promise.all([
@@ -75,14 +131,14 @@ export default function App() {
 
       setSelectedRoomDetail({
         ...baseRoom,
-        devices: devices || mockCampusData.devicesByRoom[roomId] || [],
-        currentSchedule: schedule || baseRoom?.currentSchedule || mockCampusData.schedulesByRoom[roomId] || null,
-        kwh: metric?.kwh !== undefined ? metric.kwh : baseRoom?.kwh || 0.0
+        devices: Array.isArray(devices) ? devices : [],
+        currentSchedule: schedule || null,
+        kwh: metric?.kwh !== undefined ? metric.kwh : 0.0
       });
     } catch (err) {
       setSelectedRoomDetail({
         ...baseRoom,
-        devices: mockCampusData.devicesByRoom[roomId] || []
+        devices: []
       });
     }
   };
@@ -106,6 +162,10 @@ export default function App() {
         onSelectTab={setActiveTab} 
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        goodDevicesCount={deviceStats.goodCount}
+        totalDevicesCount={deviceStats.totalCount}
+        brokenDevicesCount={deviceStats.brokenCount}
+        pendingTicketsCount={deviceStats.pendingTicketsCount}
       />
 
       {/* 2. Main Content Viewport */}
@@ -177,6 +237,7 @@ export default function App() {
 
           {activeTab === 'rooms' && (
             <RoomsView 
+              searchQuery={searchQuery}
               onNavigateToTickets={() => setActiveTab('tickets')}
             />
           )}
@@ -193,11 +254,14 @@ export default function App() {
           )}
 
           {activeTab === 'schedule' && (
-            <ScheduleView />
+            <ScheduleView 
+              searchQuery={searchQuery}
+            />
           )}
 
           {activeTab === 'devices' && (
             <DevicesView 
+              searchQuery={searchQuery}
               onNavigateToTickets={() => setActiveTab('tickets')}
             />
           )}
@@ -207,7 +271,9 @@ export default function App() {
           )}
 
           {activeTab === 'tickets' && (
-            <TicketsView />
+            <TicketsView 
+              searchQuery={searchQuery}
+            />
           )}
         </main>
       </div>

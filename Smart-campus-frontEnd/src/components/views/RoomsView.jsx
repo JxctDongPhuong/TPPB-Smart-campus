@@ -23,16 +23,21 @@ import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { RoomScheduleDropdown } from './RoomScheduleDropdown';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
-export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
+export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets, searchQuery = '' }) {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchQuery);
   const [filterToa, setFilterToa] = useState('ALL');
   const [filterTang, setFilterTang] = useState('ALL');
   const [filterLoai, setFilterLoai] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
+
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== null) {
+      setSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Phòng đang mở rộng danh sách các ca học / ca trống (đổ xuống ngay dưới dòng)
   const [expandedRoomId, setExpandedRoomId] = useState(null);
@@ -56,13 +61,10 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
     setLoading(true);
     try {
       const data = await campusApi.getAllRoomsList();
-      if (data && data.length) {
-        setRooms(data);
-      } else {
-        setRooms(mockCampusData.allRooms);
-      }
-    } catch {
-      setRooms(mockCampusData.allRooms);
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('[RoomsView] Lỗi tải danh sách phòng:', err);
+      setRooms([]);
     } finally {
       setLoading(false);
     }
@@ -75,15 +77,25 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
   // Filter logic
   const filteredRooms = rooms.filter(r => {
     if (r.da_xoa) return false;
-    const matchSearch = (r.ma_phong || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.ten_phong || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.loai_phong || '').toLowerCase().includes(search.toLowerCase());
+    const q = (search || '').trim().toLowerCase();
+    const matchSearch = !q ||
+                        (r.ma_phong || '').toLowerCase().includes(q) ||
+                        (r.ten_phong || '').toLowerCase().includes(q) ||
+                        (r.loai_phong || '').toLowerCase().includes(q) ||
+                        (r.toa || '').toLowerCase().includes(q) ||
+                        (`tòa ${r.toa || ''}`).toLowerCase().includes(q) ||
+                        (`tầng ${r.tang || ''}`).toLowerCase().includes(q) ||
+                        (r.trang_thai || '').toLowerCase().includes(q);
     const matchToa = filterToa === 'ALL' || r.toa === filterToa;
     const matchTang = filterTang === 'ALL' || String(r.tang) === filterTang;
     const matchLoai = filterLoai === 'ALL' || r.loai_phong === filterLoai;
     const matchStatus = filterStatus === 'ALL' || r.trang_thai === filterStatus;
     return matchSearch && matchToa && matchTang && matchLoai && matchStatus;
   });
+
+  const availableBuildings = Array.from(new Set(rooms.map(r => r.toa).filter(Boolean))).sort();
+  const availableFloors = Array.from(new Set(rooms.map(r => r.tang).filter(t => t !== undefined && t !== null))).sort((a,b) => a - b);
+  const availableTypes = Array.from(new Set(rooms.map(r => r.loai_phong).filter(Boolean))).sort();
 
   // KPI metrics
   const totalRooms = rooms.filter(r => !r.da_xoa).length;
@@ -154,14 +166,7 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
       {/* 1. Header Bar with Stats */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Cơ sở dữ liệu Phong</span>
-          </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Danh mục phòng</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Quản trị không gian giảng dạy, phân loại giảng đường, số chỗ ngồi và trạng thái vận hành thực tế.
-          </p>
         </div>
 
         <Button 
@@ -245,8 +250,9 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
               className="w-full sm:w-auto px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
               <option value="ALL">Mọi Tòa nhà</option>
-              <option value="A">Tòa A</option>
-              <option value="B">Tòa B</option>
+              {availableBuildings.map(b => (
+                <option key={b} value={b}>Tòa {b}</option>
+              ))}
             </select>
 
             <select 
@@ -255,9 +261,9 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
               className="w-full sm:w-auto px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
               <option value="ALL">Mọi Tầng</option>
-              <option value="1">Tầng 1</option>
-              <option value="2">Tầng 2</option>
-              <option value="3">Tầng 3</option>
+              {availableFloors.map(t => (
+                <option key={t} value={String(t)}>Tầng {t}</option>
+              ))}
             </select>
 
             <select 
@@ -266,10 +272,9 @@ export function RoomsView({ onSelectRoomForInspection, onNavigateToTickets }) {
               className="w-full sm:w-auto px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
               <option value="ALL">Tất cả loại phòng</option>
-              <option value="Phòng lý thuyết">Phòng lý thuyết</option>
-              <option value="Phòng máy tính">Phòng máy tính</option>
-              <option value="Hội trường">Hội trường</option>
-              <option value="Phòng học nhóm">Phòng học nhóm</option>
+              {availableTypes.map(lp => (
+                <option key={lp} value={lp}>{lp}</option>
+              ))}
             </select>
 
             <select 

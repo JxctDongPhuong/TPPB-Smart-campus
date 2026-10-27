@@ -13,13 +13,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Inbox
+  Inbox,
+  AlertTriangle,
+  HelpCircle,
+  Trash2,
+  Search
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
 const CA_INFO = {
   1: { label: 'Ca 1 (Sáng)', time: '07:30 - 11:30', bg: 'bg-amber-50 text-amber-700 border-amber-200/60' },
@@ -27,17 +30,36 @@ const CA_INFO = {
   3: { label: 'Ca 3 (Tối)', time: '17:30 - 21:00', bg: 'bg-purple-50 text-purple-700 border-purple-200/60' }
 };
 
-export function ScheduleView() {
+export function ScheduleView({ searchQuery = '' }) {
   const [activeSubTab, setActiveSubTab] = useState('timetable'); // 'timetable' or 'requests'
   const [schedules, setSchedules] = useState([]);
   const [requests, setRequests] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState(searchQuery);
+  const [filterToa, setFilterToa] = useState('ALL');
+
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== null) {
+      setSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Modals
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+
+  // Confirmation Dialog Modal State (supports APPROVE, REJECT, DELETE_SCHEDULE)
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    action: 'DaDuyet', // 'DaDuyet' | 'TuChoi' | 'DELETE_SCHEDULE'
+    request: null,
+    schedule: null,
+    ghiChu: '',
+    loading: false,
+    error: null
+  });
 
   // Form states
   const [scheduleForm, setScheduleForm] = useState({
@@ -50,10 +72,10 @@ export function ScheduleView() {
   });
 
   const [requestForm, setRequestForm] = useState({
-    ma_phong: 'B302',
+    ma_phong: 'A102',
     ngay: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     ca: 2,
-    so_nguoi: 15,
+    so_nguoi: 30,
     muc_dich: '',
     ghi_chu: ''
   });
@@ -66,13 +88,14 @@ export function ScheduleView() {
         campusApi.getBookingRequests(),
         campusApi.getAllRoomsList()
       ]);
-      setSchedules(schedRes?.length ? schedRes : mockCampusData.allSchedules);
-      setRequests(reqRes?.length ? reqRes : mockCampusData.allBookingRequests);
-      setRooms(roomsRes?.length ? roomsRes : mockCampusData.allRooms);
-    } catch {
-      setSchedules(mockCampusData.allSchedules);
-      setRequests(mockCampusData.allBookingRequests);
-      setRooms(mockCampusData.allRooms);
+      setSchedules(Array.isArray(schedRes) ? schedRes : []);
+      setRequests(Array.isArray(reqRes) ? reqRes : []);
+      setRooms(Array.isArray(roomsRes) ? roomsRes : []);
+    } catch (err) {
+      console.error('[ScheduleView] Lỗi tải dữ liệu:', err);
+      setSchedules([]);
+      setRequests([]);
+      setRooms([]);
     } finally {
       setLoading(false);
     }
@@ -110,6 +133,33 @@ export function ScheduleView() {
   // Filter schedules by date
   const filteredSchedules = schedules.filter(s => s.ngay === selectedDate);
 
+  // Filter rooms & schedules for matrix table
+  const availableBuildings = Array.from(new Set(rooms.map(r => r.toa).filter(Boolean))).sort();
+
+  const filteredRooms = rooms.filter(r => {
+    if (r.da_xoa) return false;
+    const q = (search || '').trim().toLowerCase();
+    const matchToa = filterToa === 'ALL' || r.toa === filterToa;
+
+    const roomSchedules = schedules.filter(s => s.ma_phong === r.ma_phong && s.ngay === selectedDate);
+    const hasMatchingSchedule = roomSchedules.some(s => 
+      (s.noi_dung || '').toLowerCase().includes(q) ||
+      (s.ten_mon_hoc || '').toLowerCase().includes(q) ||
+      (s.giang_vien || '').toLowerCase().includes(q) ||
+      (s.ma_lich || '').toLowerCase().includes(q)
+    );
+
+    const matchSearch = !q ||
+                        (r.ma_phong || '').toLowerCase().includes(q) ||
+                        (r.ten_phong || '').toLowerCase().includes(q) ||
+                        (r.loai_phong || '').toLowerCase().includes(q) ||
+                        (r.toa || '').toLowerCase().includes(q) ||
+                        (`tòa ${r.toa || ''}`).toLowerCase().includes(q) ||
+                        hasMatchingSchedule;
+
+    return matchToa && matchSearch;
+  });
+
   // Thêm lịch học
   const handleCreateSchedule = async (e) => {
     e.preventDefault();
@@ -123,18 +173,30 @@ export function ScheduleView() {
       return alert(`Lỗi trùng lịch: Phòng ${scheduleForm.ma_phong} ngày ${scheduleForm.ngay} trong Ca ${scheduleForm.ca} đã có người sử dụng!`);
     }
 
-    const newSched = await campusApi.createSchedule({
-      ...scheduleForm,
-      ca: Number(scheduleForm.ca),
-      so_nguoi: Number(scheduleForm.so_nguoi)
-    });
-    setSchedules(prev => [newSched, ...prev]);
-    setIsAddScheduleModalOpen(false);
-    alert('Thêm lịch phòng thành công!');
+    try {
+      await campusApi.createSchedule({
+        ...scheduleForm,
+        ca: Number(scheduleForm.ca),
+        so_nguoi: Number(scheduleForm.so_nguoi)
+      });
+      setIsAddScheduleModalOpen(false);
+      setScheduleForm({
+        ma_phong: rooms[0]?.ma_phong || 'A101',
+        ngay: selectedDate,
+        ca: 1,
+        loai: 'HOC',
+        noi_dung: '',
+        so_nguoi: 40
+      });
+      await loadData();
+      alert('Đã xếp lịch phòng thành công!');
+    } catch (err) {
+      alert(`Không thể xếp lịch: ${err.message}`);
+    }
   };
 
-  // Mở modal đặt lịch phòng khi bấm vào ô ca trống
-  const handleOpenBookingSlot = (maPhong, caNum) => {
+  // Mở đăng ký nhanh từ ô trống
+  const handleQuickBook = (maPhong, caNum) => {
     setRequestForm(prev => ({
       ...prev,
       ma_phong: maPhong,
@@ -151,39 +213,94 @@ export function ScheduleView() {
     e.preventDefault();
     if (!requestForm.muc_dich) return alert('Vui lòng nhập mục đích mượn!');
 
-    const newReq = await campusApi.submitBookingRequest({
-      ...requestForm,
-      ca: Number(requestForm.ca),
-      so_nguoi: Number(requestForm.so_nguoi)
-    });
-    setRequests(prev => [newReq, ...prev]);
-    setIsRequestModalOpen(false);
-    alert('Đã gửi yêu cầu mượn phòng tới Ban Quản Lý CSVC!');
+    try {
+      await campusApi.submitBookingRequest({
+        ...requestForm,
+        ca: Number(requestForm.ca),
+        so_nguoi: Number(requestForm.so_nguoi)
+      });
+      setIsRequestModalOpen(false);
+      await loadData();
+      alert('Đã gửi yêu cầu mượn phòng tới Ban Quản Lý CSVC thành công!');
+    } catch (err) {
+      alert(`Lỗi gửi yêu cầu: ${err.message}`);
+    }
   };
 
-  // Duyệt / Từ chối yêu cầu mượn
-  const handleProcessRequest = async (maYc, trangThai) => {
-    const ghiChu = trangThai === 'DaDuyet' ? 'Chấp thuận cấp phòng sử dụng' : 'Từ chối do trùng kế hoạch vệ sinh';
-    await campusApi.processBookingRequest(maYc, { trang_thai: trangThai, ghi_chu: ghiChu });
+  // Mở hộp thoại xác nhận Duyệt hoặc Từ chối yêu cầu
+  const handleOpenConfirmDialog = (request, action) => {
+    setConfirmDialog({
+      isOpen: true,
+      action: action,
+      request: request,
+      schedule: null,
+      ghiChu: action === 'DaDuyet' 
+        ? 'Chấp thuận cấp phòng sử dụng theo kế hoạch' 
+        : 'Từ chối do trùng kế hoạch bảo trì hoặc không phù hợp',
+      loading: false,
+      error: null
+    });
+  };
 
-    setRequests(prev => prev.map(r => r.ma_yc === maYc ? { ...r, trang_thai: trangThai, ghi_chu: ghiChu } : r));
+  // Mở hộp thoại xác nhận Xóa lịch phòng
+  const handleOpenDeleteScheduleDialog = (sched) => {
+    setConfirmDialog({
+      isOpen: true,
+      action: 'DELETE_SCHEDULE',
+      request: null,
+      schedule: sched,
+      ghiChu: '',
+      loading: false,
+      error: null
+    });
+  };
 
-    // Nếu duyệt, tự động bổ sung vào lịch phòng (LichPhong)
-    if (trangThai === 'DaDuyet') {
-      const req = requests.find(r => r.ma_yc === maYc);
-      if (req) {
-        const generatedSchedule = {
-          ma_lich: Date.now(),
-          ma_phong: req.ma_phong,
-          ngay: req.ngay,
-          ca: req.ca,
-          loai: 'MUON',
-          noi_dung: req.muc_dich,
-          so_nguoi: req.so_nguoi,
-          trang_thai: 'Đã xếp lịch'
-        };
-        setSchedules(prev => [generatedSchedule, ...prev]);
+  // Đóng hộp thoại xác nhận
+  const handleCloseConfirmDialog = () => {
+    if (confirmDialog.loading) return;
+    setConfirmDialog({
+      isOpen: false,
+      action: 'DaDuyet',
+      request: null,
+      schedule: null,
+      ghiChu: '',
+      loading: false,
+      error: null
+    });
+  };
+
+  // Thực hiện Duyệt / Từ chối / Xóa lịch sau khi bấm xác nhận trong Dialog Box
+  const handleExecuteConfirm = async () => {
+    setConfirmDialog(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      if (confirmDialog.action === 'DELETE_SCHEDULE' && confirmDialog.schedule) {
+        await campusApi.deleteSchedule(confirmDialog.schedule.ma_lich);
+        handleCloseConfirmDialog();
+        await loadData();
+        return;
       }
+
+      if (confirmDialog.request) {
+        const maYc = confirmDialog.request.ma_yc;
+        const trangThai = confirmDialog.action;
+        const ghiChu = confirmDialog.ghiChu.trim();
+
+        await campusApi.processBookingRequest(maYc, { 
+          trang_thai: trangThai, 
+          ghi_chu: ghiChu 
+        });
+
+        handleCloseConfirmDialog();
+        await loadData();
+      }
+    } catch (err) {
+      console.error('[handleExecuteConfirm Error]', err);
+      setConfirmDialog(prev => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Lỗi khi xử lý thao tác!'
+      }));
     }
   };
 
@@ -191,17 +308,10 @@ export function ScheduleView() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header */}
+      {/* 1. Header (Chỉ giữ lại Title lớn duy nhất theo yêu cầu) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Hệ thống LichPhong & YeuCauMuon</span>
-          </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Lịch phòng học</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Điều phối ca học chính khóa, tránh xung đột lịch phòng học và xét duyệt mượn không gian campus.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -236,7 +346,7 @@ export function ScheduleView() {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>Thời Khóa Biểu Phòng Học ({filteredSchedules.length} ca hôm nay)</span>
+          <span>Thời Khóa Biểu Phòng Học ({filteredSchedules.length} ca ngày này)</span>
         </button>
 
         <button
@@ -248,265 +358,305 @@ export function ScheduleView() {
           }`}
         >
           <UserCheck className="w-4 h-4" />
-          <span>Duyệt Yêu Cầu Mượn Phòng</span>
+          <span>Phê Duyệt Mượn Phòng</span>
           {pendingRequestsCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold">
-              {pendingRequestsCount}
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+              {pendingRequestsCount} chờ duyệt
             </span>
           )}
         </button>
       </div>
 
-      {/* 3. SUBTAB 1: TIMETABLE & MATRIX VIEW */}
+      {/* 3. TAB 1: THỜI KHÓA BIỂU MATRIX THEO CA (1, 2, 3) */}
       {activeSubTab === 'timetable' && (
-        <div className="space-y-4">
-          {/* Date Controller */}
-          <Card className="p-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrevDay}
-                title="Chuyển qua lịch ngày trước đó"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-slate-700 hover:text-blue-600 shadow-2xs transition-all cursor-pointer group"
-              >
-                <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-                <span>Ngày trước</span>
-              </button>
-
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold text-slate-700">Ngày hiển thị:</span>
-                <input 
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200">
-                <Button 
-                  size="sm" 
-                  variant={selectedDate === new Date().toISOString().split('T')[0] ? 'primary' : 'outline'}
+        <div className="space-y-4 animate-fade-in-up">
+          {/* Controls: Chọn ngày & ca & Tìm kiếm / Lọc */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">Xem ngày:</span>
+                <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+                  <button 
+                    onClick={handlePrevDay} 
+                    className="p-1.5 hover:bg-slate-200 text-slate-600 transition-colors"
+                    title="Ngày trước"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <input 
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="px-2 py-1 text-xs font-bold bg-transparent border-0 focus:outline-none text-slate-800"
+                  />
+                  <button 
+                    onClick={handleNextDay} 
+                    className="p-1.5 hover:bg-slate-200 text-slate-600 transition-colors"
+                    title="Ngày sau"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+                <button 
                   onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                  className="text-xs text-blue-600 font-bold hover:underline ml-1"
                 >
                   Hôm nay
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={selectedDate === new Date(Date.now() + 86400000).toISOString().split('T')[0] ? 'primary' : 'outline'}
-                  onClick={() => setSelectedDate(new Date(Date.now() + 86400000).toISOString().split('T')[0])}
-                >
-                  Ngày mai
-                </Button>
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleNextDay}
-                title="Chuyển qua lịch ngày tiếp theo"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-slate-700 hover:text-blue-600 shadow-2xs transition-all cursor-pointer group"
-              >
-                <span>Ngày tiếp</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </button>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-blue-500"></span>
+                  <span className="text-slate-600 font-medium">Lớp chính khóa (HOC)</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-purple-500"></span>
+                  <span className="text-slate-600 font-medium">Mượn sự kiện (MUON)</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-slate-100 border border-dashed border-slate-300"></span>
+                  <span className="text-slate-600 font-medium">Phòng trống</span>
+                </span>
+              </div>
             </div>
-          </Card>
 
-          {/* Timetable Matrix Grid */}
-          <Card className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-[760px]">
-              <colgroup>
-                <col className="w-44" />
-                <col className="w-1/3" />
-                <col className="w-1/3" />
-                <col className="w-1/3" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase">
-                  <th className="p-4 w-44">Phòng học</th>
-                  <th className="p-4 w-1/3">{CA_INFO[1].label}<br/><span className="text-[10px] lowercase text-slate-400 font-medium">{CA_INFO[1].time}</span></th>
-                  <th className="p-4 w-1/3">{CA_INFO[2].label}<br/><span className="text-[10px] lowercase text-slate-400 font-medium">{CA_INFO[2].time}</span></th>
-                  <th className="p-4 w-1/3">{CA_INFO[3].label}<br/><span className="text-[10px] lowercase text-slate-400 font-medium">{CA_INFO[3].time}</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {rooms.map((room) => {
-                  return (
-                    <tr key={room.ma_phong} className="hover:bg-slate-50/60 transition-colors">
-                      {/* Room Column */}
-                      <td className="p-4 align-top font-bold text-slate-900 bg-slate-50/30">
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">{room.ma_phong}</p>
-                          <span className="text-[10px] text-slate-400 font-medium">{room.loai_phong}</span>
-                        </div>
+            {/* Sub-bar: Search & Filter Rooms & Classes */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text" 
+                  placeholder="Tìm theo phòng (A101, B302), môn học, hoặc giảng viên..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select 
+                  value={filterToa}
+                  onChange={(e) => setFilterToa(e.target.value)}
+                  className="w-full sm:w-auto px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
+                >
+                  <option value="ALL">Mọi Tòa nhà</option>
+                  {availableBuildings.map(b => (
+                    <option key={b} value={b}>Tòa {b}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Matrix Bảng Lịch Học & Phòng */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3.5 px-4 w-44 sticky left-0 bg-slate-50/95 z-10 backdrop-blur-xs">
+                      Phòng học ({filteredRooms.length})
+                    </th>
+                    <th className="py-3.5 px-4 w-1/3 border-l border-slate-200/80">
+                      <div className="flex items-center justify-between">
+                        <span>Ca 1 (Sáng)</span>
+                        <span className="text-[10px] text-slate-400 font-mono font-normal">07:30 - 11:30</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 w-1/3 border-l border-slate-200/80">
+                      <div className="flex items-center justify-between">
+                        <span>Ca 2 (Chiều)</span>
+                        <span className="text-[10px] text-slate-400 font-mono font-normal">13:00 - 17:00</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 w-1/3 border-l border-slate-200/80">
+                      <div className="flex items-center justify-between">
+                        <span>Ca 3 (Tối)</span>
+                        <span className="text-[10px] text-slate-400 font-mono font-normal">17:30 - 21:00</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredRooms.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="py-12 text-center text-slate-400">
+                        <Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        Không tìm thấy phòng hoặc lịch học nào khớp với điều kiện tìm kiếm.
                       </td>
+                    </tr>
+                  ) : (
+                    filteredRooms.map((room) => (
+                      <tr key={room.ma_phong} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Phòng header cột trái */}
+                        <td className="py-3 px-4 font-bold sticky left-0 bg-white z-10 border-r border-slate-100 shadow-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/60 text-blue-700 flex items-center justify-center text-xs font-black">
+                              {room.ma_phong}
+                            </span>
+                            <div>
+                              <div className="text-slate-900 font-bold text-xs">{room.ma_phong}</div>
+                              <div className="text-[10px] text-slate-400 font-medium">{room.loai_phong || 'Phòng học'} • {room.suc_chua || 40} chỗ</div>
+                            </div>
+                          </div>
+                        </td>
 
-                      {/* Ca 1 to 3 */}
-                      {[1, 2, 3].map((caNum) => {
-                        const sched = filteredSchedules.find(s => s.ma_phong === room.ma_phong && s.ca === caNum);
+                        {/* 3 Ca: 1, 2, 3 */}
+                        {[1, 2, 3].map(caNum => {
+                          const sched = filteredSchedules.find(s => s.ma_phong === room.ma_phong && s.ca === caNum);
 
-                        if (sched) {
-                          const isMuon = sched.loai === 'MUON';
                           return (
-                            <td key={caNum} className="p-3 align-top">
-                              <div className={`p-2.5 rounded-xl border ${
-                                isMuon ? 'bg-purple-50/70 border-purple-200 text-purple-900' : 'bg-blue-50/70 border-blue-200 text-blue-900'
-                              } space-y-1.5 shadow-2xs`}>
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
-                                    isMuon ? 'bg-purple-200 text-purple-800' : 'bg-blue-200 text-blue-800'
-                                  }`}>
-                                    {isMuon ? 'Mượn phòng' : 'Chính khóa'}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-slate-400 font-mono">#{sched.ma_lich}</span>
-                                </div>
-                                
-                                <p className="font-extrabold text-xs line-clamp-2 leading-tight break-words">
-                                  {sched.noi_dung || sched.ten_mon_hoc}
-                                </p>
+                            <td key={caNum} className="p-2 border-l border-slate-100 align-top">
+                              {sched ? (
+                                <div className={`p-3 rounded-xl border transition-all relative group ${
+                                  sched.loai === 'HOC'
+                                    ? 'bg-blue-50/80 border-blue-200/80 hover:border-blue-300'
+                                    : 'bg-purple-50/80 border-purple-200/80 hover:border-purple-300'
+                                }`}>
+                                  <div className="flex items-start justify-between gap-1 mb-1.5">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider uppercase ${
+                                      sched.loai === 'HOC' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                                    }`}>
+                                      {sched.loai === 'HOC' ? 'Lớp học' : 'Mượn phòng'}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-mono text-slate-500 font-bold">
+                                        {CA_INFO[caNum].time}
+                                      </span>
+                                      {/* Nút xóa lịch học */}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenDeleteScheduleDialog(sched);
+                                        }}
+                                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                        title="Xóa lịch này"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
 
-                                {/* Hiển thị hợp lý theo yêu cầu Hình 3: Lịch học là GV & Lớp, Mượn phòng là Bên mượn & Đối tượng tham gia */}
-                                {isMuon ? (
-                                  <div className="pt-1 border-t border-purple-200/60 space-y-0.5 text-[10px] text-purple-950">
-                                    <p className="truncate">
-                                      <span className="text-slate-500 font-normal">Bên mượn: </span>
-                                      <strong className="font-bold">{sched.ben_muon || sched.giang_vien || 'Đoàn Thanh Niên'}</strong>
-                                    </p>
-                                    <p className="truncate">
-                                      <span className="text-slate-500 font-normal">Đối tượng tham gia: </span>
-                                      <strong className="font-bold">{sched.doi_tuong || sched.lop || 'Toàn trường'}</strong>
-                                    </p>
+                                  <div className="font-bold text-slate-900 text-xs line-clamp-1 mb-1">
+                                    {sched.noi_dung || sched.ten_mon_hoc || 'Hoạt động học tập'}
                                   </div>
-                                ) : (
-                                  <div className="pt-1 border-t border-blue-200/60 space-y-0.5 text-[10px] text-blue-950">
-                                    {sched.giang_vien && (
-                                      <p className="truncate">
-                                        <span className="text-slate-500 font-normal">GV: </span>
-                                        <strong className="font-bold">{sched.giang_vien}</strong>
-                                      </p>
-                                    )}
-                                    {sched.lop && (
-                                      <p className="truncate">
-                                        <span className="text-slate-500 font-normal">Lớp: </span>
-                                        <strong className="font-bold">{sched.lop}</strong>
-                                      </p>
-                                    )}
+
+                                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/40">
+                                    <span className="truncate max-w-[130px]">
+                                      {sched.giang_vien || sched.ben_muon || 'Giảng viên phụ trách'}
+                                    </span>
+                                    <span className="flex items-center gap-1 font-mono text-[10px]">
+                                      <Users className="w-3 h-3" />
+                                      {sched.so_nguoi || room.suc_chua || 40}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleQuickBook(room.ma_phong, caNum)}
+                                  className="w-full h-20 rounded-xl border-2 border-dashed border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/40 transition-all flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 group cursor-pointer"
+                                >
+                                  <Plus className="w-4 h-4 mb-0.5 group-hover:scale-110 transition-transform" />
+                                  <span className="text-[11px] font-medium">Trống • Nhấn mượn</span>
+                                </button>
+                              )}
                             </td>
                           );
-                        }
-
-                        {/* Ô ca trống: Nhấp vào để đặt phòng theo yêu cầu Hình 3 */}
-                        return (
-                          <td key={caNum} className="p-2.5 align-middle text-center">
-                            <button
-                              onClick={() => handleOpenBookingSlot(room.ma_phong, caNum)}
-                              title={`Bấm để đặt phòng ${room.ma_phong} (Ca ${caNum})`}
-                              className="w-full py-3 px-2 rounded-xl border border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/70 text-slate-400 hover:text-blue-700 transition-all flex flex-col items-center justify-center gap-1 group cursor-pointer"
-                            >
-                              <div className="flex items-center gap-1">
-                                <Plus className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <span className="text-[11px] font-bold group-hover:underline">
-                                  Trống ca
-                                </span>
-                              </div>
-                              <span className="text-[9px] text-slate-400 group-hover:text-blue-600 font-normal">
-                                + Đặt lịch ca này
-                              </span>
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* 4. SUBTAB 2: BOOKING REQUESTS (YeuCauMuon) */}
+      {/* 4. TAB 2: QUẢN LÝ VÀ PHÊ DUYỆT YÊU CẦU MƯỢN (YeuCauMuon) */}
       {activeSubTab === 'requests' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-4 bg-gradient-to-br from-white to-amber-50/40">
-              <p className="text-xs font-bold text-slate-500">Đang chờ xét duyệt</p>
-              <p className="text-2xl font-black text-amber-700 mt-1">{pendingRequestsCount}</p>
-              <span className="text-[10px] text-amber-600">Cần Admin phê duyệt</span>
-            </Card>
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200">
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm">Danh Sách Yêu Cầu Mượn Phòng ({requests.length})</h2>
+              <p className="text-xs text-slate-500">Xét duyệt cấp quyền sử dụng phòng cho sinh viên, giảng viên và CLB.</p>
+            </div>
 
-            <Card className="p-4 bg-gradient-to-br from-white to-emerald-50/40">
-              <p className="text-xs font-bold text-slate-500">Đã chấp thuận</p>
-              <p className="text-2xl font-black text-emerald-700 mt-1">
-                {requests.filter(r => r.trang_thai === 'DaDuyet').length}
-              </p>
-              <span className="text-[10px] text-emerald-600">Đã tự động chuyển vào LichPhong</span>
-            </Card>
-
-            <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
-              <p className="text-xs font-bold text-slate-500">Từ chối / Đã hủy</p>
-              <p className="text-2xl font-black text-slate-700 mt-1">
-                {requests.filter(r => r.trang_thai === 'TuChoi').length}
-              </p>
-              <span className="text-[10px] text-slate-500">Không đủ điều kiện</span>
-            </Card>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              icon={Plus} 
+              onClick={() => setIsRequestModalOpen(true)}
+            >
+              Tạo Yêu Cầu Mới
+            </Button>
           </div>
 
-          <div className="space-y-3">
-            {requests.map((req) => {
+          <div className="grid grid-cols-1 gap-3">
+            {requests.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400">
+                <Inbox className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm font-bold">Chưa có yêu cầu mượn phòng nào trong hệ thống Neon DB.</p>
+              </div>
+            ) : requests.map((req) => {
               const isPending = req.trang_thai === 'ChoDuyet';
               const isApproved = req.trang_thai === 'DaDuyet';
+              const isRejected = req.trang_thai === 'TuChoi';
 
               return (
-                <Card key={req.ma_yc} className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-900">Yêu cầu #{req.ma_yc}</span>
-                      <Badge variant={isApproved ? 'success' : isPending ? 'warning' : 'default'} size="sm">
-                        {req.trang_thai === 'ChoDuyet' ? 'Chờ Duyệt' : req.trang_thai === 'DaDuyet' ? 'Đã Chấp Thuận' : 'Từ Chối'}
-                      </Badge>
-                      <span className="text-xs text-slate-400">• Người gửi: {req.nguoi_gui_ten || `Tài khoản #${req.ma_tk}`}</span>
+                <Card key={req.ma_yc} className="p-4 border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex flex-col items-center justify-center font-black shrink-0">
+                      <span className="text-sm">{req.ma_phong}</span>
+                      <span className="text-[9px] font-bold uppercase text-blue-500">Ca {req.ca}</span>
                     </div>
 
-                    <h4 className="font-bold text-sm text-slate-800">{req.muc_dich}</h4>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-sm">
+                          Yêu cầu #{req.ma_yc}: {req.muc_dich}
+                        </span>
+                        {isPending && <Badge variant="warning">Chờ Duyệt</Badge>}
+                        {isApproved && <Badge variant="success">Đã Phê Duyệt</Badge>}
+                        {isRejected && <Badge variant="danger">Từ Chối</Badge>}
+                      </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
-                      <span className="flex items-center gap-1 font-semibold text-blue-700">
-                        <DoorClosed className="w-3.5 h-3.5" /> Phòng {req.ma_phong}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" /> Ngày: {req.ngay}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> {CA_INFO[req.ca]?.label || `Ca ${req.ca}`}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5" /> {req.so_nguoi} người
-                      </span>
+                      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          Ngày mượn: <strong className="text-slate-700">{req.ngay}</strong>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          {CA_INFO[req.ca]?.label} ({CA_INFO[req.ca]?.time})
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                          {req.so_nguoi} người tham gia
+                        </span>
+                        <span className="text-slate-400">
+                          Người gửi: <strong className="text-slate-600">{req.nguoi_gui_info?.ho_ten || req.nguoi_muon || 'Người dùng'}</strong>
+                        </span>
+                      </div>
+
+                      {req.ghi_chu && (
+                        <div className="text-xs text-slate-600 italic bg-slate-50 px-2 py-1 rounded border border-slate-100 max-w-xl">
+                          Ghi chú: {req.ghi_chu}
+                        </div>
+                      )}
                     </div>
-
-                    {req.ghi_chu && (
-                      <p className="text-xs text-slate-500 italic bg-slate-50 p-2 rounded-lg mt-1 border border-slate-100">
-                        Ghi chú Admin: {req.ghi_chu}
-                      </p>
-                    )}
                   </div>
 
-                  {/* Admin Actions */}
+                  {/* Admin Actions: Có hộp thoại xác nhận khi bấm */}
                   {isPending && (
                     <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                       <Button 
                         size="sm" 
                         variant="primary" 
                         icon={CheckCircle2}
-                        onClick={() => handleProcessRequest(req.ma_yc, 'DaDuyet')}
-                        className="bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => handleOpenConfirmDialog(req, 'DaDuyet')}
+                        className="bg-emerald-600 hover:bg-emerald-700 shadow-xs cursor-pointer"
                       >
                         Phê Duyệt
                       </Button>
@@ -514,8 +664,8 @@ export function ScheduleView() {
                         size="sm" 
                         variant="outline" 
                         icon={XCircle}
-                        onClick={() => handleProcessRequest(req.ma_yc, 'TuChoi')}
-                        className="text-rose-600 hover:bg-rose-50"
+                        onClick={() => handleOpenConfirmDialog(req, 'TuChoi')}
+                        className="text-rose-600 hover:bg-rose-50 border-rose-200 cursor-pointer"
                       >
                         Từ Chối
                       </Button>
@@ -528,7 +678,180 @@ export function ScheduleView() {
         </div>
       )}
 
-      {/* 5. MODAL XẾP LỊCH PHÒNG MỚI (LichPhong) */}
+      {/* 5. HỘP THOẠI XÁC NHẬN PHÊ DUYỆT / HỦY BỎ / XÓA LỊCH */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in-up">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className={`p-5 border-b flex items-center justify-between ${
+              confirmDialog.action === 'DaDuyet' 
+                ? 'bg-emerald-50/80 border-emerald-100' 
+                : 'bg-rose-50/80 border-rose-100'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                {confirmDialog.action === 'DaDuyet' ? (
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                ) : confirmDialog.action === 'DELETE_SCHEDULE' ? (
+                  <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    {confirmDialog.action === 'DaDuyet' 
+                      ? 'Xác nhận Phê Duyệt Cấp Phòng' 
+                      : confirmDialog.action === 'DELETE_SCHEDULE'
+                      ? 'Xác nhận Xóa Lịch Phòng Học'
+                      : 'Xác nhận Hủy / Từ Chối Yêu Cầu'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {confirmDialog.action === 'DaDuyet' 
+                      ? 'Cấp phép sử dụng phòng học và tạo lịch phòng chính thức.' 
+                      : confirmDialog.action === 'DELETE_SCHEDULE'
+                      ? 'Giải phóng lịch phòng này để ca học trở lại trạng thái trống.'
+                      : 'Hủy bỏ hoặc từ chối đề xuất mượn phòng này.'}
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleCloseConfirmDialog} 
+                disabled={confirmDialog.loading}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Question Box */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 mb-2">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  <span className="text-xs font-bold text-slate-800">
+                    {confirmDialog.action === 'DaDuyet' 
+                      ? 'Bạn có chắc chắn muốn phê duyệt yêu cầu này không?' 
+                      : confirmDialog.action === 'DELETE_SCHEDULE'
+                      ? 'Bạn có thực sự muốn xóa lịch phòng này khỏi hệ thống không?'
+                      : 'Bạn có thực sự muốn hủy bỏ / từ chối yêu cầu này không?'}
+                  </span>
+                </div>
+
+                {/* Case 1: Booking Request details */}
+                {confirmDialog.request && (
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-slate-100 font-medium">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Phòng & Ca:</span>
+                      <strong className="text-blue-700 font-bold">
+                        Phòng {confirmDialog.request.ma_phong} (Ca {confirmDialog.request.ca})
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Ngày mượn:</span>
+                      <strong className="text-slate-800">{confirmDialog.request.ngay}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Người mượn:</span>
+                      <strong className="text-slate-800">
+                        {confirmDialog.request.nguoi_gui_info?.ho_ten || confirmDialog.request.nguoi_muon || 'Người dùng'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Số lượng sinh viên:</span>
+                      <strong className="text-slate-800">{confirmDialog.request.so_nguoi} người</strong>
+                    </div>
+                    <div className="col-span-2 pt-1 border-t border-slate-50">
+                      <span className="text-slate-400 block text-[11px]">Mục đích:</span>
+                      <strong className="text-slate-900">{confirmDialog.request.muc_dich}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {/* Case 2: Schedule details */}
+                {confirmDialog.schedule && (
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-slate-100 font-medium">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Phòng & Ca:</span>
+                      <strong className="text-blue-700 font-bold">
+                        Phòng {confirmDialog.schedule.ma_phong} ({CA_INFO[confirmDialog.schedule.ca]?.label})
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Ngày học:</span>
+                      <strong className="text-slate-800">{confirmDialog.schedule.ngay}</strong>
+                    </div>
+                    <div className="col-span-2 pt-1 border-t border-slate-50">
+                      <span className="text-slate-400 block text-[11px]">Tên môn / Hoạt động:</span>
+                      <strong className="text-slate-900">{confirmDialog.schedule.noi_dung || confirmDialog.schedule.ten_mon_hoc}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Note / Reason input (only for booking request) */}
+              {confirmDialog.action !== 'DELETE_SCHEDULE' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    {confirmDialog.action === 'DaDuyet' ? 'Ghi chú phê duyệt (Tùy chọn)' : 'Lý do từ chối / hủy bỏ *'}
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={confirmDialog.ghiChu}
+                    onChange={(e) => setConfirmDialog(prev => ({ ...prev, ghiChu: e.target.value }))}
+                    placeholder={confirmDialog.action === 'DaDuyet' ? 'Ví dụ: Đã kiểm tra cơ sở vật chất, cấp phòng...' : 'Ví dụ: Phòng đang bảo dưỡng điều hòa, đề nghị chuyển phòng khác...'}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              )}
+
+              {/* Error Alert */}
+              {confirmDialog.error && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{confirmDialog.error}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleCloseConfirmDialog}
+                disabled={confirmDialog.loading}
+              >
+                Hủy Bỏ / Giữ Lại
+              </Button>
+
+              <Button
+                type="button"
+                variant={confirmDialog.action === 'DaDuyet' ? 'primary' : 'danger'}
+                onClick={handleExecuteConfirm}
+                disabled={confirmDialog.loading}
+                className={confirmDialog.action === 'DaDuyet' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}
+              >
+                {confirmDialog.loading ? 'Đang Xử Lý...' : (
+                  confirmDialog.action === 'DaDuyet' 
+                    ? 'Xác Nhận Phê Duyệt' 
+                    : confirmDialog.action === 'DELETE_SCHEDULE'
+                    ? 'Xác Nhận Xóa Lịch'
+                    : 'Xác Nhận Hủy / Từ Chối'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL XẾP LỊCH PHÒNG MỚI (LichPhong) */}
       {isAddScheduleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in-up">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
@@ -629,7 +952,7 @@ export function ScheduleView() {
         </div>
       )}
 
-      {/* 6. MODAL GỬI YÊU CẦU MƯỢN (YeuCauMuon) */}
+      {/* 7. MODAL GỬI YÊU CẦU MƯỢN (YeuCauMuon) */}
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in-up">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
