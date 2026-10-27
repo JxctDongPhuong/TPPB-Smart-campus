@@ -1,16 +1,16 @@
 import React from 'react';
-import { 
-  X, 
-  BookOpen, 
-  User, 
-  Users, 
-  Clock 
+import {
+  X,
+  BookOpen,
+  User,
+  Users,
+  Clock
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 
-export function RoomInspectPanel({ 
-  room, 
-  onClose 
+export function RoomInspectPanel({
+  room,
+  onClose
 }) {
   if (!room) return null;
 
@@ -109,7 +109,7 @@ export function RoomInspectPanel({
 
   return (
     <div className="bg-white flex flex-col h-full overflow-hidden select-none">
-      
+
       {/* 1. Header (Mã phòng, Tên phòng, Trạng thái, Vị trí & Nút X) */}
       <div className="p-5 border-b border-slate-100 flex items-start justify-between shrink-0">
         <div className="min-w-0">
@@ -117,23 +117,21 @@ export function RoomInspectPanel({
             <h3 className="font-extrabold text-base text-slate-900 truncate">
               {room.ten_phong || `Phòng Lý Thuyết ${roomId}`}
             </h3>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
-                isOccupied 
-                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' 
-                  : isMaintenance 
-                    ? 'bg-rose-50 text-rose-600 border border-rose-200/60' 
-                    : 'bg-blue-50 text-blue-600 border border-blue-200/60'
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${isOccupied
+              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60'
+              : isMaintenance
+                ? 'bg-rose-50 text-rose-600 border border-rose-200/60'
+                : 'bg-blue-50 text-blue-600 border border-blue-200/60'
               }`}>
-                {room.trang_thai || 'Sẵn sàng'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5 truncate">
-              Tòa {room.toa || 'A'} • Tầng {room.tang || 1} • {room.loai_phong || 'Phòng lý thuyết'} ({room.dien_tich || 65} m²)
-            </p>
+              {room.trang_thai || 'Sẵn sàng'}
+            </span>
           </div>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">
+            Tòa {room.toa || 'A'} • Tầng {room.tang || 1} • {room.loai_phong || 'Phòng lý thuyết'} ({room.dien_tich || 65} m²)
+          </p>
         </div>
 
-        <button 
+        <button
           onClick={onClose}
           className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ml-2"
           title="Đóng chi tiết"
@@ -142,10 +140,10 @@ export function RoomInspectPanel({
         </button>
       </div>
 
-      {/* 2. Body: THÔNG TIN TIẾT HỌC (Hình 2 chính xác, đã xóa hoàn toàn thiết bị) */}
+      {/* 2. Body: THÔNG TIN TIẾT HỌC */}
       <div className="p-5 overflow-y-auto">
         <div className="bg-white p-5 rounded-2xl border border-blue-200/90 shadow-2xs space-y-4">
-          
+
           {/* Card Header: Biểu tượng sách + THÔNG TIN TIẾT HỌC + Badge Đang diễn ra */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2 text-blue-600">
@@ -201,10 +199,9 @@ export function RoomInspectPanel({
               </span>
             </div>
           </div>
-
         </div>
       </div>
-
     </div>
   );
 }
+

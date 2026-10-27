@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Monitor, 
-  Tv, 
-  Wind, 
-  Plus, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Wrench, 
-  Archive, 
-  Cpu, 
-  Zap, 
+import {
+  Monitor,
+  Tv,
+  Wind,
+  Plus,
+  Search,
+  Filter,
+  CheckCircle2,
+  AlertTriangle,
+  Wrench,
+  Archive,
+  Cpu,
+  Zap,
   Layers,
   XCircle,
   FileWarning,
@@ -129,13 +129,13 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
     if (d.da_xoa) return false;
     const q = (search || '').trim().toLowerCase();
     const matchSearch = !q ||
-                        (d.ma_tb || '').toLowerCase().includes(q) ||
-                        (d.ten_tb || '').toLowerCase().includes(q) ||
-                        (d.ma_lo || '').toLowerCase().includes(q) ||
-                        (d.ma_phong || '').toLowerCase().includes(q) ||
-                        (`phòng ${d.ma_phong || ''}`).toLowerCase().includes(q) ||
-                        (d.ma_loai || '').toLowerCase().includes(q) ||
-                        (d.tinh_trang || '').toLowerCase().includes(q);
+      (d.ma_tb || '').toLowerCase().includes(q) ||
+      (d.ten_tb || '').toLowerCase().includes(q) ||
+      (d.ma_lo || '').toLowerCase().includes(q) ||
+      (d.ma_phong || '').toLowerCase().includes(q) ||
+      (`phòng ${d.ma_phong || ''}`).toLowerCase().includes(q) ||
+      (d.ma_loai || '').toLowerCase().includes(q) ||
+      (d.tinh_trang || '').toLowerCase().includes(q);
     const matchType = filterType === 'ALL' || d.ma_loai === filterType;
     const matchStatus = filterStatus === 'ALL' || d.tinh_trang === filterStatus;
     const matchRoom = filterRoom === 'ALL' || (filterRoom === 'KHO' ? !d.ma_phong : d.ma_phong === filterRoom);
@@ -232,18 +232,18 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            icon={Layers} 
+          <Button
+            variant="outline"
+            icon={Layers}
             onClick={() => setIsBatchModalOpen(true)}
             className="text-xs"
           >
             Nhập Theo Lô (Batch)
           </Button>
 
-          <Button 
-            variant="primary" 
-            icon={Plus} 
+          <Button
+            variant="primary"
+            icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
             className="text-xs shadow-md shadow-blue-500/20"
           >
@@ -305,9 +305,9 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Tìm theo mã thiết bị (TB_ML_A101), tên thiết bị, mã lô..." 
+            <input
+              type="text"
+              placeholder="Tìm theo mã thiết bị (TB_ML_A101), tên thiết bị, mã lô..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -315,8 +315,8 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select 
-              value={filterType} 
+            <select
+              value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
@@ -327,8 +327,8 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <option value="QUAT">Quạt thông gió</option>
             </select>
 
-            <select 
-              value={filterStatus} 
+            <select
+              value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
@@ -339,8 +339,8 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <option value="Thanh lý">Thanh lý</option>
             </select>
 
-            <select 
-              value={filterRoom} 
+            <select
+              value={filterRoom}
               onChange={(e) => setFilterRoom(e.target.value)}
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none"
             >
@@ -463,7 +463,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
                 }
 
                 const toggleExpand = (rowKey) => {
-                  setExpandedRowKeys(prev => 
+                  setExpandedRowKeys(prev =>
                     prev.includes(rowKey) ? prev.filter(k => k !== rowKey) : [...prev, rowKey]
                   );
                 };
@@ -473,11 +473,10 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
                   return (
                     <React.Fragment key={item.key}>
                       {/* Master Row */}
-                      <tr 
+                      <tr
                         onClick={() => toggleExpand(item.key)}
-                        className={`hover:bg-blue-50/50 cursor-pointer transition-colors text-[11px] ${
-                          isExpanded ? 'bg-blue-50/70 font-semibold' : 'bg-white'
-                        }`}
+                        className={`hover:bg-blue-50/50 cursor-pointer transition-colors text-[11px] ${isExpanded ? 'bg-blue-50/70 font-semibold' : 'bg-white'
+                          }`}
                       >
                         <td className="py-2 px-2 text-center text-slate-400">
                           {isExpanded ? (
@@ -492,11 +491,10 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
                         <td className="py-2 px-3 text-center text-slate-600">{item.seri}</td>
                         <td className="py-2 px-3 text-right font-bold text-slate-900">{item.totalQty.toLocaleString()}</td>
                         <td className="py-2 px-3 text-center whitespace-nowrap">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            item.warrantyExpired 
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${item.warrantyExpired
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
                               : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          }`}>
+                            }`}>
                             {item.warranty}
                           </span>
                         </td>
@@ -527,13 +525,12 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
                                     return (
                                       <tr key={sIdx} className="hover:bg-blue-50/50">
                                         <td className="py-1.5 px-3">
-                                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                            isBroken 
-                                              ? 'bg-rose-100 text-rose-700' 
-                                              : isRepairing 
-                                              ? 'bg-amber-100 text-amber-800' 
-                                              : 'bg-blue-50 text-blue-700'
-                                          }`}>
+                                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${isBroken
+                                              ? 'bg-rose-100 text-rose-700'
+                                              : isRepairing
+                                                ? 'bg-amber-100 text-amber-800'
+                                                : 'bg-blue-50 text-blue-700'
+                                            }`}>
                                             {sub.status}
                                           </span>
                                         </td>
@@ -593,7 +590,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
             <form onSubmit={handleCreateDevice} className="p-6 space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Mã thiết bị (duy nhất) *</label>
-                <input 
+                <input
                   type="text"
                   required
                   placeholder="Ví dụ: TB_ML_A103"
@@ -605,7 +602,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Tên thiết bị</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Ví dụ: Điều hòa Daikin 2.5HP"
                   value={deviceForm.ten_tb}
@@ -617,7 +614,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Loại thiết bị</label>
-                  <select 
+                  <select
                     value={deviceForm.ma_loai}
                     onChange={(e) => setDeviceForm(prev => ({ ...prev, ma_loai: e.target.value }))}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -631,7 +628,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Vị trí lắp đặt</label>
-                  <select 
+                  <select
                     value={deviceForm.ma_phong}
                     onChange={(e) => setDeviceForm(prev => ({ ...prev, ma_phong: e.target.value }))}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -647,7 +644,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Công suất (W)</label>
-                  <input 
+                  <input
                     type="number"
                     value={deviceForm.cong_suat_w}
                     onChange={(e) => setDeviceForm(prev => ({ ...prev, cong_suat_w: e.target.value }))}
@@ -657,7 +654,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Năm mua</label>
-                  <input 
+                  <input
                     type="number"
                     value={deviceForm.nam_mua}
                     onChange={(e) => setDeviceForm(prev => ({ ...prev, nam_mua: e.target.value }))}
@@ -667,7 +664,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Tình trạng</label>
-                  <select 
+                  <select
                     value={deviceForm.tinh_trang}
                     onChange={(e) => setDeviceForm(prev => ({ ...prev, tinh_trang: e.target.value }))}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -708,7 +705,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Loại thiết bị</label>
-                  <select 
+                  <select
                     value={batchForm.ma_loai}
                     onChange={(e) => setBatchForm(prev => ({ ...prev, ma_loai: e.target.value }))}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -721,7 +718,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Mã lô (ví dụ: PC_LAB3) *</label>
-                  <input 
+                  <input
                     type="text"
                     required
                     value={batchForm.ma_lo}
@@ -734,7 +731,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Số lượng máy tự sinh *</label>
-                  <input 
+                  <input
                     type="number"
                     min="1"
                     max="100"
@@ -747,7 +744,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Gán vào phòng</label>
-                  <select 
+                  <select
                     value={batchForm.ma_phong}
                     onChange={(e) => setBatchForm(prev => ({ ...prev, ma_phong: e.target.value }))}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -763,7 +760,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Công suất mỗi máy (W)</label>
-                  <input 
+                  <input
                     type="number"
                     value={batchForm.cong_suat_w}
                     onChange={(e) => setBatchForm(prev => ({ ...prev, cong_suat_w: e.target.value }))}
@@ -773,7 +770,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Năm trang bị</label>
-                  <input 
+                  <input
                     type="number"
                     value={batchForm.nam_mua}
                     onChange={(e) => setBatchForm(prev => ({ ...prev, nam_mua: e.target.value }))}
@@ -817,7 +814,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Mô tả hiện tượng hư hỏng *</label>
-                <textarea 
+                <textarea
                   required
                   rows="3"
                   placeholder="Ghi rõ hiện tượng (Ví dụ: Chập điện, không lên nguồn, quạt kêu rít to...)"
@@ -829,7 +826,7 @@ export function DevicesView({ onNavigateToTickets, searchQuery = '' }) {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Mức độ ảnh hưởng</label>
-                <select 
+                <select
                   value={reportForm.muc_do}
                   onChange={(e) => setReportForm(prev => ({ ...prev, muc_do: e.target.value }))}
                   className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-medium"

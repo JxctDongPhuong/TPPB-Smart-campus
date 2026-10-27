@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  Mail, 
-  Moon, 
-  Sun, 
-  Users, 
-  LogOut, 
-  ChevronRight, 
+import {
+  User,
+  Mail,
+  Moon,
+  Sun,
+  Users,
+  LogOut,
+  ChevronRight,
   ChevronDown,
-  Check, 
-  ShieldCheck, 
+  Check,
+  ShieldCheck,
   LogIn,
   KeyRound,
   ArrowRight
@@ -18,8 +18,8 @@ import {
 export function UserAccountMenu({ isOpen, onClose }) {
   // Trạng thái theme sáng / tối được đọc từ documentElement hoặc localStorage
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return document.documentElement.classList.contains('dark') || 
-           localStorage.getItem('campus_theme') === 'dark';
+    return document.documentElement.classList.contains('dark') ||
+      localStorage.getItem('campus_theme') === 'dark';
   });
 
   // Trạng thái mở rộng danh sách chuyển đổi tài khoản (đổ xuống inline)
@@ -139,7 +139,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
 
   return (
     <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-slate-200/90 shadow-2xl z-50 overflow-hidden animate-scale-in select-none text-slate-800">
-      
+
       {/* 1. Header Thông tin tài khoản (Ảnh + Tên + Email) */}
       <div className="p-4 border-b border-slate-100 flex items-start gap-3 bg-slate-50/70">
         <div className={`w-10 h-10 rounded-full ${isLoggedOut ? 'bg-slate-400' : currentAccount.avatarBg} text-white font-black text-sm flex items-center justify-center shrink-0 ring-2 ring-blue-500/20 shadow-xs`}>
@@ -163,10 +163,10 @@ export function UserAccountMenu({ isOpen, onClose }) {
 
       {/* 2. Danh sách mục menu */}
       <div className="py-1 text-xs divide-y divide-slate-100">
-        
+
         {/* Mục 1: Giao diện (Sáng / Tối) - Click đổi ngay màu toàn trang */}
         <div className="py-0.5">
-          <button 
+          <button
             onClick={handleToggleTheme}
             className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer group"
           >
@@ -192,7 +192,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
         {/* Mục 2: Chuyển đổi tài khoản (ĐỔ XUỐNG TỪ VỊ TRÍ NÀY, KHÔNG HIỆN MODAL Ở GIỮA) */}
         {!isLoggedOut && (
           <div className="py-0.5">
-            <button 
+            <button
               onClick={() => setIsSwitchExpanded(prev => !prev)}
               className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer group"
             >
@@ -219,11 +219,10 @@ export function UserAccountMenu({ isOpen, onClose }) {
                   <div
                     key={acc.id}
                     onClick={() => handleSelectAccount(acc.id)}
-                    className={`p-2 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
-                      acc.isActive 
-                        ? 'bg-blue-50 text-blue-900 font-bold border border-blue-200 shadow-2xs' 
+                    className={`p-2 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-all ${acc.isActive
+                        ? 'bg-blue-50 text-blue-900 font-bold border border-blue-200 shadow-2xs'
                         : 'hover:bg-white text-slate-700'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`w-7 h-7 rounded-full ${acc.avatarBg} text-white font-black text-[11px] flex items-center justify-center shrink-0`}>
@@ -255,7 +254,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
         <div className="py-0.5">
           {!isLoggedOut ? (
             /* Khi đang đăng nhập: Hiện nút Đăng xuất */
-            <button 
+            <button
               onClick={handleLogoutClick}
               className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-rose-50 text-rose-600 transition-colors cursor-pointer font-bold group"
             >
@@ -267,7 +266,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
           ) : (
             /* Khi đã bấm Đăng xuất: Hiển thị là Đăng nhập, nhấp vào sẽ đổ xuống form nhập mật khẩu */
             <div>
-              <button 
+              <button
                 onClick={handleLoginClick}
                 className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-blue-50 text-blue-600 transition-colors cursor-pointer font-bold group"
               >
@@ -286,8 +285,8 @@ export function UserAccountMenu({ isOpen, onClose }) {
 
               {/* Form nhập tài khoản & mật khẩu ĐỔ XUỐNG NGAY TẠI VỊ TRÍ ĐĂNG NHẬP */}
               {isLoginFormExpanded && (
-                <form 
-                  onSubmit={handleSubmitLogin} 
+                <form
+                  onSubmit={handleSubmitLogin}
                   className="p-3.5 bg-blue-50/50 border-t border-b border-blue-100 space-y-2.5 animate-fade-in-down"
                 >
                   <div>
@@ -296,7 +295,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
                     </label>
                     <div className="relative">
                       <User className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input 
+                      <input
                         type="email"
                         required
                         value={loginEmail}
@@ -313,7 +312,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
                     </label>
                     <div className="relative">
                       <KeyRound className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input 
+                      <input
                         type="password"
                         required
                         value={loginPassword}
@@ -324,7 +323,7 @@ export function UserAccountMenu({ isOpen, onClose }) {
                     </div>
                   </div>
 
-                  <button 
+                  <button
                     type="submit"
                     className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 mt-1"
                   >

@@ -1,6 +1,6 @@
 import { mockCampusData } from '../data/mockData';
 
-const RAW_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const RAW_URL = import.meta.env.VITE_API_BASE_URL || 'https://smart-campus-backend-1-0.onrender.com';
 const BASE_URL = RAW_URL.replace(/\/+$/, '').replace(/\/api$/, '');
 
 /**

@@ -54,3 +54,4 @@ jobs:
           file: ./Smart-campus-frontEnd/dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/smart-campus-frontend:1.0
+

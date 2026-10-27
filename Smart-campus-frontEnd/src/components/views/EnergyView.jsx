@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Zap, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  Clock, 
-  Calendar, 
-  Sparkles, 
-  Plus, 
-  CheckCircle2, 
-  Leaf, 
-  ShieldAlert, 
+import {
+  Zap,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Clock,
+  Calendar,
+  Sparkles,
+  Plus,
+  CheckCircle2,
+  Leaf,
+  ShieldAlert,
   XCircle,
   BarChart2,
   DollarSign
@@ -207,9 +207,9 @@ export function EnergyView() {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Giám sát điện</h1>
         </div>
 
-        <Button 
-          variant="primary" 
-          icon={Plus} 
+        <Button
+          variant="primary"
+          icon={Plus}
           onClick={() => setIsRecordModalOpen(true)}
           className="text-xs shadow-md shadow-blue-500/20"
         >
@@ -241,8 +241,8 @@ export function EnergyView() {
               </div>
             </div>
 
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="primary"
               onClick={() => handleCutPower(wasteAlerts[0].ma_phong || 'B302')}
               className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm shrink-0 font-bold"
@@ -323,11 +323,10 @@ export function EnergyView() {
                   setTimeframe(tab.key);
                   setHoveredPoint(null);
                 }}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  timeframe === tab.key
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${timeframe === tab.key
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -356,10 +355,10 @@ export function EnergyView() {
         {/* Khung Biểu Đồ Dạng Đường SVG Responsive */}
         <div className="relative mt-2 w-full overflow-x-auto">
           <div className="min-w-[650px] relative">
-            
+
             {/* Tooltip khi rê chuột vào điểm */}
             {hoveredPoint && (
-              <div 
+              <div
                 className="absolute z-20 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-3 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-xl flex flex-col items-center animate-fade-in-down"
                 style={{
                   left: `${(hoveredPoint.x / svgWidth) * 100}%`,
@@ -372,8 +371,8 @@ export function EnergyView() {
               </div>
             )}
 
-            <svg 
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
               className="w-full h-56 select-none"
             >
               <defs>
@@ -397,19 +396,19 @@ export function EnergyView() {
                 const valLabel = Math.round(maxKwh * pct);
                 return (
                   <g key={idx}>
-                    <line 
-                      x1={paddingLeft} 
-                      y1={yPos} 
-                      x2={svgWidth - paddingRight} 
-                      y2={yPos} 
-                      stroke="#e2e8f0" 
-                      strokeDasharray="4 4" 
-                      strokeWidth="1" 
+                    <line
+                      x1={paddingLeft}
+                      y1={yPos}
+                      x2={svgWidth - paddingRight}
+                      y2={yPos}
+                      stroke="#e2e8f0"
+                      strokeDasharray="4 4"
+                      strokeWidth="1"
                     />
-                    <text 
-                      x={paddingLeft - 8} 
-                      y={yPos + 4} 
-                      textAnchor="end" 
+                    <text
+                      x={paddingLeft - 8}
+                      y={yPos + 4}
+                      textAnchor="end"
                       className="text-[10px] fill-slate-400 font-mono font-bold"
                     >
                       {valLabel}
@@ -419,20 +418,20 @@ export function EnergyView() {
               })}
 
               {/* Vùng diện tích mờ (Area Under Curve) */}
-              <path 
-                d={areaPathD} 
-                fill="url(#energyLineGrad)" 
+              <path
+                d={areaPathD}
+                fill="url(#energyLineGrad)"
                 className="transition-all duration-500 ease-out"
               />
 
               {/* Đường biểu đồ (Curve Stroke) */}
-              <path 
-                d={linePathD} 
-                fill="none" 
-                stroke="url(#lineStrokeGrad)" 
-                strokeWidth="3.2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
+              <path
+                d={linePathD}
+                fill="none"
+                stroke="url(#lineStrokeGrad)"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 className="transition-all duration-500 ease-out filter drop-shadow-xs"
               />
 
@@ -443,37 +442,35 @@ export function EnergyView() {
                   <g key={idx} className="cursor-pointer" onMouseEnter={() => setHoveredPoint(pt)} onMouseLeave={() => setHoveredPoint(null)}>
                     {/* Đường gióng dọc khi hover */}
                     {isHovered && (
-                      <line 
-                        x1={pt.x} 
-                        y1={paddingTop} 
-                        x2={pt.x} 
-                        y2={paddingTop + chartH} 
-                        stroke="#3b82f6" 
-                        strokeDasharray="2 2" 
-                        strokeWidth="1.5" 
+                      <line
+                        x1={pt.x}
+                        y1={paddingTop}
+                        x2={pt.x}
+                        y2={paddingTop + chartH}
+                        stroke="#3b82f6"
+                        strokeDasharray="2 2"
+                        strokeWidth="1.5"
                       />
                     )}
 
                     {/* Vòng tròn điểm */}
-                    <circle 
-                      cx={pt.x} 
-                      cy={pt.y} 
-                      r={isHovered ? 6.5 : 4} 
-                      className={`transition-all duration-150 ${
-                        isHovered 
-                          ? 'fill-white stroke-blue-600 stroke-[3.5]' 
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 6.5 : 4}
+                      className={`transition-all duration-150 ${isHovered
+                          ? 'fill-white stroke-blue-600 stroke-[3.5]'
                           : 'fill-white stroke-blue-600 stroke-[2.5]'
-                      }`}
+                        }`}
                     />
 
                     {/* Nhãn trục thời gian bên dưới */}
-                    <text 
-                      x={pt.x} 
-                      y={svgHeight - 10} 
-                      textAnchor="middle" 
-                      className={`text-[11px] font-bold transition-colors ${
-                        isHovered ? 'fill-blue-600 font-black' : 'fill-slate-500'
-                      }`}
+                    <text
+                      x={pt.x}
+                      y={svgHeight - 10}
+                      textAnchor="middle"
+                      className={`text-[11px] font-bold transition-colors ${isHovered ? 'fill-blue-600 font-black' : 'fill-slate-500'
+                        }`}
                     >
                       {pt.label}
                     </text>
@@ -579,7 +576,7 @@ export function EnergyView() {
             <form onSubmit={handleRecordMetric} className="p-6 space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Chọn phòng học</label>
-                <select 
+                <select
                   value={metricForm.ma_phong}
                   onChange={(e) => setMetricForm(prev => ({ ...prev, ma_phong: e.target.value }))}
                   className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none font-bold"
@@ -595,8 +592,8 @@ export function EnergyView() {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Ngày ghi nhận</label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   required
                   value={metricForm.ngay}
                   onChange={(e) => setMetricForm(prev => ({ ...prev, ngay: e.target.value }))}
@@ -606,9 +603,9 @@ export function EnergyView() {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Điện năng tiêu thụ (kWh)</label>
-                <input 
-                  type="number" 
-                  step="0.1" 
+                <input
+                  type="number"
+                  step="0.1"
                   min="0"
                   required
                   value={metricForm.kwh}
@@ -619,9 +616,9 @@ export function EnergyView() {
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Số giờ hoạt động</label>
-                <input 
-                  type="number" 
-                  step="0.5" 
+                <input
+                  type="number"
+                  step="0.5"
                   min="0"
                   max="24"
                   required
